@@ -4,6 +4,7 @@ import { MainMenuScene } from './scenes/MainMenuScene';
 import { CombatScene } from './scenes/CombatScene';
 import { ItemRewardScene } from './scenes/ItemRewardScene';
 import { LoginScene } from './scenes/LoginScene';
+import { GameOverScene } from './scenes/GameOverScene';
 import { PlayerState } from './PlayerState';
 
 export class Game {
@@ -35,6 +36,7 @@ export class Game {
         this.scenes.register('menu', new MainMenuScene(this));
         this.scenes.register('combat', new CombatScene(this));
         this.scenes.register('reward', new ItemRewardScene(this));
+        this.scenes.register('gameover', new GameOverScene(this));
 
         // Start
         this.scenes.switchTo('login');

@@ -1,5 +1,6 @@
 import type { IPlayerState } from "./items/types";
 import { ItemSystem, ITEMS } from "./items/ItemSystem";
+import { AchievementSystem, ACHIEVEMENTS } from "./utils/AchievementSystem";
 
 export class PlayerState implements IPlayerState {
     public hpBase: number = 120;
@@ -28,6 +29,25 @@ export class PlayerState implements IPlayerState {
     public reviveCount: number = 0;
     public reviveHpRatio: number = 0.5; // 0.5, 0.8, 1.0
 
+    // Achievement Cosmetics
+    public characterTint: number = 0x00aaff; // Default Blue
+
+    // Getters for Achievement Buffs (Passive)
+    public get achievementAtkBonus(): number {
+        const stats = AchievementSystem.loadStats();
+        return stats.unlockedAchievements[ACHIEVEMENTS.COMBO_MASTER] ? 0.05 : 0;
+    }
+
+    public get achievementHpBonus(): number {
+        const stats = AchievementSystem.loadStats();
+        return stats.unlockedAchievements[ACHIEVEMENTS.IMMORTAL] ? 0.2 : 0;
+    }
+
+    public get achievementScoreBonus(): number {
+        const stats = AchievementSystem.loadStats();
+        return stats.unlockedAchievements[ACHIEVEMENTS.SCHOLAR] ? 0.1 : 0;
+    }
+
     // Inventory
     public inventory: string[] = [];
 
@@ -44,7 +64,8 @@ export class PlayerState implements IPlayerState {
             currentHp,
             score: this.score,
             highestCombo: Math.max(this.highestCombo, currentCombo),
-            inventory: this.inventory
+            inventory: this.inventory,
+            characterTint: this.characterTint
         };
         localStorage.setItem('typingRpgSaveData', JSON.stringify(saveData));
     }
@@ -63,6 +84,9 @@ export class PlayerState implements IPlayerState {
             this.score = data.score || 0;
             this.highestCombo = data.highestCombo || 0;
             this.inventory = data.inventory || [];
+            if (data.characterTint !== undefined) {
+                this.characterTint = data.characterTint;
+            }
 
             // Re-apply items to reconstruct stacks/multipliers
             this.applyInventory();

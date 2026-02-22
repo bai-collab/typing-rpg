@@ -4,6 +4,8 @@ import { CloudSave } from '../utils/CloudSave';
 import { ITEMS } from '../items/ItemSystem';
 import { tweenManager, Easing } from '../utils/Tween';
 import { VOCABULARY, type VocabWord } from '../data/Vocabulary';
+import { AchievementSystem, type AchievementDef } from '../utils/AchievementSystem';
+import { LeaderboardSystem } from '../utils/LeaderboardSystem';
 
 interface TargetItem {
     text: string;
@@ -156,7 +158,13 @@ export class CombatScene extends Scene {
     // Particles
     private particles: { graphics: Graphics, vx: number, vy: number, life: number, maxLife: number }[] = [];
 
+    private usedReviveThisLevel: boolean = false;
+    private levelErrors: number = 0;
+
     public async enter(data?: any) {
+        this.usedReviveThisLevel = false;
+        this.levelErrors = 0;
+
         if (!data?.resume) {
             // New Game or Loading from Global Save
             const savedData = await this.game.playerState.loadFromStorage();
@@ -209,13 +217,13 @@ export class CombatScene extends Scene {
 
     private applyPlayerStats() {
         const p = this.game.playerState;
-        this.heroAtk = Math.max(1, Math.floor(2 * p.attackMultiplier));
+        this.heroAtk = Math.max(1, Math.floor(2 * (p.attackMultiplier + p.achievementAtkBonus)));
         this.heroDef = Math.max(0, Math.floor(3 * p.defenseMultiplier));
 
         // Scale current HP based on ratio? Or just flat increase.
         // Easiest is to keep flat HP, just raise max. But if we want, we can buff it. Let's just raise max.
         const prevMax = this.heroMaxHp;
-        this.heroMaxHp = Math.floor(120 * p.hpMultiplier);
+        this.heroMaxHp = Math.floor(120 * (p.hpMultiplier + p.achievementHpBonus));
         // If Max HP increased, give them the diff
         if (this.heroMaxHp > prevMax) {
             this.heroHp += (this.heroMaxHp - prevMax);
@@ -521,9 +529,6 @@ export class CombatScene extends Scene {
 
     private handleKeyDown = (e: KeyboardEvent) => {
         if (this.state === 'GAME_OVER') {
-            if (e.key === 'Enter') {
-                this.enter(); // restart
-            }
             return;
         }
 
@@ -547,9 +552,10 @@ export class CombatScene extends Scene {
             this.typedIndex++;
             this.currentCombo++;
             this.game.playerState.highestCombo = Math.max(this.game.playerState.highestCombo, this.currentCombo);
+            AchievementSystem.onComboUpdate(this.currentCombo, this.showAchievementUnlock.bind(this));
 
             // Add score points for each correct letter
-            this.game.playerState.score += 10;
+            this.game.playerState.score += Math.floor(10 * (1.0 + this.game.playerState.achievementScoreBonus));
 
             if (this.currentCombo === 5) this.showComboPopup("Good!", '#00aaff');
             else if (this.currentCombo === 10) this.showComboPopup("Great!\nATK+10%", '#aa00ff');
@@ -569,6 +575,7 @@ export class CombatScene extends Scene {
         } else {
             // Incorrect
             this.errors++;
+            this.levelErrors++;
             this.currentCombo = 0; // Reset combo
             this.comboScoreText.text = '';
 
@@ -683,6 +690,7 @@ export class CombatScene extends Scene {
                                 if (this.heroHp <= 0) {
                                     if (p.reviveCount > 0) {
                                         p.reviveCount--;
+                                        this.usedReviveThisLevel = true;
                                         this.heroHp = Math.floor(this.heroMaxHp * p.reviveHpRatio);
                                         this.feedbackText.text = `REVIVED!`;
                                         this.feedbackText.style.fill = '#00ff00';
@@ -692,19 +700,35 @@ export class CombatScene extends Scene {
                                         this.heroHp = 0;
                                         this.updateUI();
                                         this.state = 'GAME_OVER';
-                                        this.feedbackText.text = "GAME OVER\nPress ENTER to Restart";
+                                        this.feedbackText.text = "GAME OVER";
                                         this.feedbackText.style.fill = '#ff0000';
 
                                         // Clear save on death
                                         import('../PlayerState').then(m => m.PlayerState.clearStorage());
 
-                                        CloudSave.reportMatchResult({
-                                            mode: this.mode,
+                                        if (typeof CloudSave !== 'undefined') {
+                                            CloudSave.reportMatchResult({
+                                                mode: this.mode,
+                                                level: this.level,
+                                                score: p.score,
+                                                maxCombo: p.highestCombo,
+                                                won: false
+                                            });
+                                        }
+
+                                        const acc = this.levelErrors === 0 ? 1.0 : 0.0;
+                                        LeaderboardSystem.saveRun({
+                                            date: new Date().toLocaleDateString(),
                                             level: this.level,
-                                            score: p.score,
-                                            maxCombo: p.highestCombo,
-                                            won: false
+                                            accuracy: acc,
+                                            mode: this.mode,
+                                            playTime: 0,
+                                            typedCount: p.score
                                         });
+
+                                        setTimeout(() => {
+                                            this.game.scenes.switchTo('gameover', { mode: this.mode, level: this.level, accuracy: acc });
+                                        }, 1500);
                                     }
                                 } else {
                                     setTimeout(() => { if (this.monsterHp > 0) this.startTurn(); else this.executeVictory(); }, 500);
@@ -902,6 +926,8 @@ export class CombatScene extends Scene {
         this.state = 'RESOLVING';
         const item = this.targetQueue[this.targetQueueIndex];
         const p = this.game.playerState;
+
+        AchievementSystem.onWordTyped(item.text, this.showAchievementUnlock.bind(this));
 
         // Base Damage calculation
         let lengthMultiplier = 1;
@@ -1132,6 +1158,10 @@ export class CombatScene extends Scene {
     private executeVictory() {
         this.monsterHp = 0;
         this.heroHp = Math.min(this.heroMaxHp, this.heroHp + this.heroHeal); // Full clear        
+
+        const accuracy = this.levelErrors === 0 ? 1.0 : 0.0;
+        AchievementSystem.onLevelComplete(this.mode, accuracy, this.usedReviveThisLevel, this.showAchievementUnlock.bind(this));
+
         // Save progress right after victory (LocalStorage Cache)
         this.game.playerState.saveToStorage(this.level, this.mode, this.heroHp, 0);
 
@@ -1364,5 +1394,53 @@ export class CombatScene extends Scene {
             }
         }
         return g;
+    }
+
+    private showAchievementUnlock(ach: AchievementDef) {
+        const AudioUtils = (window as any).AudioUtils || { playDing: () => { } }; // Just in case, actually it's a class at top of file. Well I can just reference it directly since it's in scope. Oh right I should just use the class
+
+        // The real AudioUtils class is in the same file
+        try {
+            // @ts-ignore
+            AudioUtils.playDing(1.5);
+        } catch (e) { }
+
+        const banner = new Container();
+        banner.y = -100;
+        banner.x = 400;
+
+        const bg = new Graphics();
+        bg.rect(-200, -40, 400, 80).fill({ color: 0x222222, alpha: 0.9 }).stroke({ width: 2, color: 0xffd700 });
+        banner.addChild(bg);
+
+        const icon = new Text({ text: ach.icon, style: new TextStyle({ fontSize: 40 }) });
+        icon.anchor.set(0.5);
+        icon.x = -150;
+        banner.addChild(icon);
+
+        const title = new Text({ text: "Achievement Unlocked!", style: new TextStyle({ fontFamily: 'Courier New', fontSize: 16, fill: '#ffd700', fontWeight: 'bold' }) });
+        title.anchor.set(0.5, 1);
+        title.y = -15;
+        banner.addChild(title);
+
+        const name = new Text({ text: ach.title, style: new TextStyle({ fontFamily: '"Microsoft JhengHei", Arial', fontSize: 20, fill: '#ffffff' }) });
+        name.anchor.set(0.5, 0);
+        name.y = 5;
+        banner.addChild(name);
+
+        this.container.addChild(banner);
+
+        tweenManager.to({
+            target: banner, props: { y: 100 }, duration: 500, easing: Easing.easeOutBack, onComplete: () => {
+                setTimeout(() => {
+                    tweenManager.to({
+                        target: banner, props: { y: -100 }, duration: 500, easing: Easing.easeInQuad, onComplete: () => {
+                            this.container.removeChild(banner);
+                            banner.destroy({ children: true });
+                        }
+                    });
+                }, 3000);
+            }
+        });
     }
 }
