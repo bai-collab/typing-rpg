@@ -161,9 +161,20 @@ export class CombatScene extends Scene {
     private usedReviveThisLevel: boolean = false;
     private levelErrors: number = 0;
 
+    private isInventoryExpanded: boolean = false;
+    private isPaused: boolean = false;
+    private pauseOverlay: Container | null = null;
+
     public async enter(data?: any) {
         this.usedReviveThisLevel = false;
         this.levelErrors = 0;
+        this.isInventoryExpanded = false;
+        this.isPaused = false;
+        if (this.pauseOverlay) {
+            this.container.removeChild(this.pauseOverlay);
+            this.pauseOverlay.destroy({ children: true });
+            this.pauseOverlay = null;
+        }
 
         if (!data?.resume) {
             // New Game or Loading from Global Save
@@ -314,13 +325,19 @@ export class CombatScene extends Scene {
         const itemStacks = this.game.playerState.itemStacks;
         const keys = Object.keys(itemStacks);
 
-        if (keys.length === 0) return;
-
         const titleText = new Text({
-            text: '獲得戰利品:',
+            text: `獲得戰利品 ${this.isInventoryExpanded ? '[▲]' : '[▼]'}:`,
             style: new TextStyle({ fontFamily: 'Courier New, "Microsoft JhengHei", sans-serif', fontSize: 16, fill: '#aaaaaa' })
         });
+        titleText.eventMode = 'static';
+        titleText.cursor = 'pointer';
+        titleText.on('pointerdown', () => {
+            this.isInventoryExpanded = !this.isInventoryExpanded;
+            this.renderItems();
+        });
         this.itemsContainer.addChild(titleText);
+
+        if (!this.isInventoryExpanded || keys.length === 0) return;
 
         let yOffset = 25;
         keys.forEach(id => {
@@ -410,7 +427,7 @@ export class CombatScene extends Scene {
             const healVal = Math.floor(this.heroMaxHp * p.autoHealRate);
             if (healVal > 0) {
                 this.heroHp = Math.min(this.heroMaxHp, this.heroHp + healVal);
-                this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 20, -healVal); // show as heal (negative damage is standard, but let's change text color later or just show a text)
+                this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 20, "Auto-Heal +" + healVal, '#00ff00');
             }
         }
 
@@ -419,7 +436,6 @@ export class CombatScene extends Scene {
 
         this.updateUI();
         this.renderWord();
-        this.feedbackText.text = p.autoHealRate > 0 ? `Auto-Healed HP!` : '';
     }
 
     private getCategoryIcon(cat?: string): string {
@@ -528,6 +544,13 @@ export class CombatScene extends Scene {
     }
 
     private handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            this.togglePause();
+            return;
+        }
+
+        if (this.isPaused) return;
+
         if (this.state === 'GAME_OVER') {
             return;
         }
@@ -1223,6 +1246,9 @@ export class CombatScene extends Scene {
     }
 
     public update(delta: number) {
+        if (this.isPaused) {
+            return;
+        }
         const deltaMs = delta * (1000 / 60);
         tweenManager.update(deltaMs);
 
@@ -1256,6 +1282,7 @@ export class CombatScene extends Scene {
     }
 
     public exit() {
+        this.hidePauseOverlay();
         this.container.removeChildren();
         window.removeEventListener('keydown', this.handleKeyDown);
         tweenManager.clear();
@@ -1442,5 +1469,51 @@ export class CombatScene extends Scene {
                 }, 3000);
             }
         });
+    }
+
+    private togglePause() {
+        if (this.state === 'GAME_OVER') return;
+
+        this.isPaused = !this.isPaused;
+        if (this.isPaused) {
+            this.showPauseOverlay();
+        } else {
+            this.hidePauseOverlay();
+        }
+    }
+
+    private showPauseOverlay() {
+        if (this.pauseOverlay) return;
+
+        this.pauseOverlay = new Container();
+
+        const bg = new Graphics();
+        bg.rect(0, 0, 800, 600).fill({ color: 0x000000, alpha: 0.6 });
+        this.pauseOverlay.addChild(bg);
+
+        const txt = new Text({
+            text: 'PAUSED\nPress ESC to Resume',
+            style: new TextStyle({
+                fontFamily: 'Courier New',
+                fontSize: 48,
+                fill: '#ffffff',
+                align: 'center',
+                dropShadow: { color: 0x000000, alpha: 0.8, distance: 4 }
+            })
+        });
+        txt.anchor.set(0.5);
+        txt.x = 400;
+        txt.y = 300;
+        this.pauseOverlay.addChild(txt);
+
+        this.container.addChild(this.pauseOverlay);
+    }
+
+    private hidePauseOverlay() {
+        if (this.pauseOverlay) {
+            this.container.removeChild(this.pauseOverlay);
+            this.pauseOverlay.destroy({ children: true });
+            this.pauseOverlay = null;
+        }
     }
 }
