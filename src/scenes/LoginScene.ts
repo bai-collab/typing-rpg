@@ -124,7 +124,90 @@ export class LoginScene extends Scene {
         };
 
         this.formWrapper.appendChild(formBox);
+
+        // Add Help Icon
+        const helpBtn = document.createElement('button');
+        helpBtn.innerText = '?';
+        helpBtn.style.position = 'absolute';
+        helpBtn.style.top = '20px';
+        helpBtn.style.right = '20px';
+        helpBtn.style.width = '40px';
+        helpBtn.style.height = '40px';
+        helpBtn.style.borderRadius = '20px';
+        helpBtn.style.backgroundColor = '#4CAF50';
+        helpBtn.style.color = 'white';
+        helpBtn.style.fontSize = '24px';
+        helpBtn.style.fontWeight = 'bold';
+        helpBtn.style.border = 'none';
+        helpBtn.style.cursor = 'pointer';
+        helpBtn.style.pointerEvents = 'auto';
+        helpBtn.style.boxShadow = '0 4px 8px rgba(0,0,0,0.5)';
+        helpBtn.onclick = () => this.showHelpModal();
+        this.formWrapper.appendChild(helpBtn);
+
         document.body.appendChild(this.formWrapper);
+    }
+
+    private showHelpModal() {
+        if (document.getElementById('typing-rpg-help-modal')) return;
+
+        const modalOverlay = document.createElement('div');
+        modalOverlay.id = 'typing-rpg-help-modal';
+        modalOverlay.style.position = 'fixed';
+        modalOverlay.style.top = '0';
+        modalOverlay.style.left = '0';
+        modalOverlay.style.width = '100vw';
+        modalOverlay.style.height = '100vh';
+        modalOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        modalOverlay.style.display = 'flex';
+        modalOverlay.style.justifyContent = 'center';
+        modalOverlay.style.alignItems = 'center';
+        modalOverlay.style.zIndex = '1000';
+
+        const modalBox = document.createElement('div');
+        modalBox.style.backgroundColor = '#2a2a35';
+        modalBox.style.padding = '30px';
+        modalBox.style.borderRadius = '12px';
+        modalBox.style.color = '#ffffff';
+        modalBox.style.fontFamily = '"Microsoft JhengHei", Arial';
+        modalBox.style.maxWidth = '600px';
+        modalBox.style.maxHeight = '80vh';
+        modalBox.style.overflowY = 'auto';
+        modalBox.style.lineHeight = '1.6';
+
+        modalBox.innerHTML = `
+            <h2 style="margin-top:0; color:#4CAF50;">遊戲說明 (How to Play)</h2>
+            <p>歡迎來到 Typing RPG！在這裡你需要透過打字來擊敗怪物。</p>
+            <h3>難度差異</h3>
+            <ul>
+                <li><strong>Beginner：</strong>只有隨機字母，容錯率高，節奏慢。</li>
+                <li><strong>Intermediate：</strong>練習單字，每回合給予 5 個單字，25秒倒數。</li>
+                <li><strong>Advanced：</strong>挑戰極限，每回合 5 個單字，只有 10秒倒數！</li>
+            </ul>
+            <h3>戰鬥系統與 Combo</h3>
+            <ul>
+                <li>連續輸入正確字元會累積 Combo，Combo 越高攻擊越高！全對會觸發 Perfect (流星雨特效)。</li>
+                <li>打錯字會重置 Combo，且影響結算準確率 (Accuracy)。</li>
+            </ul>
+            <h3>單字能力標籤 (中/高階)</h3>
+            <p>單字可能會帶有特殊類別，打完該單字立即獲得 Buff：</p>
+            <ul>
+                <li>🛡️ (衣服/配件)：防禦力提升</li>
+                <li>⚔️ (食物/飲料)：攻擊力提升</li>
+                <li>⏰ (時間)：回合時間 +1 秒</li>
+                <li>❤️ (學校)：恢復生命值</li>
+                <li>🐾 (動物/昆蟲)：狂暴狀態 (傷害狂飆)</li>
+                <li>🍃 (天氣/自然)：獲得 3 回合持續回血</li>
+            </ul>
+            <button id="close-help-btn" style="margin-top:20px; padding:10px 20px; background:#f44336; color:white; border:none; border-radius:6px; cursor:pointer; font-size:16px;">關閉說明</button>
+        `;
+
+        modalOverlay.appendChild(modalBox);
+        document.body.appendChild(modalOverlay);
+
+        document.getElementById('close-help-btn')!.onclick = () => {
+            modalOverlay.remove();
+        };
     }
 
     private createFormGroup(labelText: string, type: string, id: string, value: string) {

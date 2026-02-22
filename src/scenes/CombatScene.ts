@@ -384,7 +384,7 @@ export class CombatScene extends Scene {
             }
             // Shuffle
             this.targetQueue.sort(() => Math.random() - 0.5);
-            this.timeLimit = 5;
+            this.timeLimit = 10;
         }
 
         this.targetWord = this.targetQueue[0].text;

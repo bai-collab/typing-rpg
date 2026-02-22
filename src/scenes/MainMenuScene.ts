@@ -8,6 +8,7 @@ export class MainMenuScene extends Scene {
     private menuOptions: string[] = ['Beginner', 'Intermediate', 'Advanced'];
     private hasSaveData = false;
     private savedLevel = 1;
+    private descriptionText!: Text;
 
     public enter() {
         this.selectedIndex = 0;
@@ -56,6 +57,18 @@ export class MainMenuScene extends Scene {
             this.container.addChild(t);
         });
 
+        const descStyle = new TextStyle({
+            fontFamily: '"Microsoft JhengHei", Arial',
+            fontSize: 20,
+            fill: '#888888',
+            fontStyle: 'italic'
+        });
+        this.descriptionText = new Text({ text: '', style: descStyle });
+        this.descriptionText.anchor.set(0.5);
+        this.descriptionText.x = 400;
+        this.descriptionText.y = 520;
+        this.container.addChild(this.descriptionText);
+
         this.updateSelectionUI();
 
         window.addEventListener('keydown', this.handleKeyDown);
@@ -71,6 +84,17 @@ export class MainMenuScene extends Scene {
                 t.text = this.menuOptions[i];
             }
         });
+
+        // Determine which logical index is selected (offset if Resume exists)
+        const modeIdx = this.hasSaveData ? this.selectedIndex - 1 : this.selectedIndex;
+
+        if (this.hasSaveData && this.selectedIndex === 0) {
+            this.descriptionText.text = "繼續上次的冒險旅程";
+        } else {
+            if (modeIdx === 0) this.descriptionText.text = "只有字母，適合新手暖身";
+            else if (modeIdx === 1) this.descriptionText.text = "練習單字 (預設 25秒)";
+            else if (modeIdx === 2) this.descriptionText.text = "練習單字 (地獄 10秒)";
+        }
     }
 
     private handleKeyDown = (e: KeyboardEvent) => {
