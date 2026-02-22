@@ -816,7 +816,8 @@ export class CombatScene extends Scene {
                         easing: Easing.easeInQuad,
                         onComplete: () => {
                             if (accuracy === 1) {
-                                this.flashOverlay.alpha = 1;
+                                // Perfect flash effect
+                                this.flashOverlay.alpha = 0.5;
                                 tweenManager.to({ target: this.flashOverlay, props: { alpha: 0 }, duration: 400 });
                             }
 
