@@ -186,16 +186,17 @@ export class ItemRewardScene extends Scene {
             const selectedItem = this.choices[this.selectedIndex];
             ItemSystem.applyItem(selectedItem, this.game.playerState);
 
-            // Save progress with the new item (level remains same as set in CombatScene.executeVictory)
-            const saved = this.game.playerState.loadFromStorage();
-            if (saved) {
-                this.game.playerState.saveToStorage(saved.level, saved.mode, saved.currentHp, 0);
+            // Save progress with the new item 
+            const rawSave = localStorage.getItem('typingRpgSaveData');
+            if (rawSave) {
+                const savedData = JSON.parse(rawSave);
+                this.game.playerState.saveToStorage(savedData.level, savedData.mode, savedData.currentHp, 0);
 
                 // Cloud Sync
                 CloudSave.saveProgress({
-                    level: saved.level,
-                    mode: saved.mode,
-                    currentHp: saved.currentHp,
+                    level: savedData.level,
+                    mode: savedData.mode,
+                    currentHp: savedData.currentHp,
                     hpBase: this.game.playerState.hpBase,
                     score: this.game.playerState.score,
                     highestCombo: this.game.playerState.highestCombo,
