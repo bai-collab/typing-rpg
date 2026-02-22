@@ -96,7 +96,10 @@ export class PlayerState implements IPlayerState {
     public applyInventory() {
         this.resetBuffs();
 
-        for (const itemId of this.inventory) {
+        const oldInventory = Object.assign([], this.inventory);
+        this.inventory = [];
+
+        for (const itemId of oldInventory) {
             const item = ITEMS.find(i => i.id === itemId);
             if (item) {
                 ItemSystem.applyItem(item, this);

@@ -37,6 +37,7 @@ export class ItemSystem {
         if (currentCount >= 10) return;
 
         playerState.itemStacks[item.id] = currentCount + 1;
+        playerState.inventory.push(item.id);
         item.applyBuff(playerState);
     }
 }
