@@ -93,7 +93,7 @@ export class MainMenuScene extends Scene {
         } else {
             if (modeIdx === 0) this.descriptionText.text = "只有字母，適合新手暖身";
             else if (modeIdx === 1) this.descriptionText.text = "練習單字 (預設 25秒)";
-            else if (modeIdx === 2) this.descriptionText.text = "練習單字 (地獄 10秒)";
+            else if (modeIdx === 2) this.descriptionText.text = "練習單字 (地獄 5秒)";
         }
     }
 

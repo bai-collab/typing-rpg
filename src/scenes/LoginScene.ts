@@ -182,7 +182,7 @@ export class LoginScene extends Scene {
             <ul>
                 <li><strong>Beginner：</strong>只有隨機字母，容錯率高，節奏慢。</li>
                 <li><strong>Intermediate：</strong>練習單字，每回合給予 5 個單字，25秒倒數。</li>
-                <li><strong>Advanced：</strong>挑戰極限，每回合 5 個單字，只有 10秒倒數！</li>
+                <li><strong>Advanced：</strong>挑戰極限，每回合 5 個單字，只有 5秒倒數！</li>
             </ul>
             <h3>戰鬥系統與 Combo</h3>
             <ul>
