@@ -10,7 +10,7 @@ export abstract class Scene {
         this.container = new Container();
     }
 
-    public abstract enter(data?: any): void;
+    public abstract enter(data?: any): void | Promise<void>;
     public abstract update(delta: number): void;
     public abstract exit(): void;
 }

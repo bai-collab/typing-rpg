@@ -156,17 +156,19 @@ export class CombatScene extends Scene {
     // Particles
     private particles: { graphics: Graphics, vx: number, vy: number, life: number, maxLife: number }[] = [];
 
-    public enter(data?: any) {
+    public async enter(data?: any) {
         if (!data?.resume) {
             // New Game or Loading from Global Save
-            const savedData = this.game.playerState.loadFromStorage();
+            const savedData = await this.game.playerState.loadFromStorage();
 
             if (savedData && data?.fromResume) {
                 // Resume logic
                 this.mode = savedData.mode;
                 this.level = savedData.level;
                 this.heroHp = savedData.currentHp;
+
                 // Re-apply item buffs
+                await this.game.playerState.applyInventory();
                 this.applyPlayerStats();
 
                 this.setupUI();

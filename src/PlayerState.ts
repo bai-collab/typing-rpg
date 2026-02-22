@@ -62,11 +62,7 @@ export class PlayerState {
             this.inventory = data.inventory || [];
 
             // Re-apply items to reconstruct stacks/multipliers
-            this.itemStacks = {};
-            this.inventory.forEach(itemId => {
-                this.itemStacks[itemId] = (this.itemStacks[itemId] || 0) + 1;
-            });
-            // Note: The multipliers would typically be recalculated by whoever calls applyItems()
+            this.applyInventory();
 
             return data;
         } catch (e) {
@@ -75,7 +71,35 @@ export class PlayerState {
         }
     }
 
-    public resetRound() {
-        // Reset single-round flags like shield if needed
+    public resetBuffs() {
+        this.attackMultiplier = 1.0;
+        this.defenseMultiplier = 1.0;
+        this.hpMultiplier = 1.0;
+        this.healMultiplier = 1.0;
+        this.timeAddition = 0.0;
+        this.critChance = 0.0;
+        this.reflectDamageRatio = 0.0;
+        this.hasCritShield = false;
+        this.autoHealRate = 0.0;
+        this.perfectTimeBonus = 0.0;
+        this.comboDamageBonusR = 0;
+        this.combo3DamageMultiplier = 1.0;
+        this.combo5DamageMultiplier = 1.0;
+        this.reviveCount = 0;
+        this.reviveHpRatio = 0.5;
+        this.itemStacks = {};
+    }
+
+    public async applyInventory() {
+        this.resetBuffs();
+        const { ItemSystem } = await import('./items/ItemSystem');
+        const { ITEMS } = await import('./items/ItemSystem');
+
+        for (const itemId of this.inventory) {
+            const item = ITEMS.find(i => i.id === itemId);
+            if (item) {
+                ItemSystem.applyItem(item, this);
+            }
+        }
     }
 }

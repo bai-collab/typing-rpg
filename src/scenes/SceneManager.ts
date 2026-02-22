@@ -25,7 +25,7 @@ export class SceneManager {
         this.scenes.set(name, scene);
     }
 
-    public switchTo(name: string, data?: any) {
+    public async switchTo(name: string, data?: any) {
         if (this.currentScene) {
             this.container.removeChild(this.currentScene.container);
             this.currentScene.exit();
@@ -35,7 +35,7 @@ export class SceneManager {
         if (scene) {
             this.currentScene = scene;
             this.container.addChild(this.currentScene.container);
-            this.currentScene.enter(data);
+            await this.currentScene.enter(data);
         } else {
             console.error(`Scene ${name} not found!`);
         }
