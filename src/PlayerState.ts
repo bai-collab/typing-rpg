@@ -1,4 +1,7 @@
-export class PlayerState {
+import type { IPlayerState } from "./items/types";
+import { ItemSystem, ITEMS } from "./items/ItemSystem";
+
+export class PlayerState implements IPlayerState {
     public hpBase: number = 120;
     public score: number = 0;
     public highestCombo: number = 0;
@@ -90,10 +93,8 @@ export class PlayerState {
         this.itemStacks = {};
     }
 
-    public async applyInventory() {
+    public applyInventory() {
         this.resetBuffs();
-        const { ItemSystem } = await import('./items/ItemSystem');
-        const { ITEMS } = await import('./items/ItemSystem');
 
         for (const itemId of this.inventory) {
             const item = ITEMS.find(i => i.id === itemId);
