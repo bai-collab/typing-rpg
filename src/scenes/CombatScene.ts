@@ -816,9 +816,25 @@ export class CombatScene extends Scene {
                         easing: Easing.easeInQuad,
                         onComplete: () => {
                             if (accuracy === 1) {
-                                // Perfect flash effect
-                                this.flashOverlay.alpha = 0.5;
-                                tweenManager.to({ target: this.flashOverlay, props: { alpha: 0 }, duration: 400 });
+                                // Meteor Strike effect for Perfect
+                                const meteor = new Graphics();
+                                meteor.circle(0, 0, 15).fill({ color: 0xff4400 }).stroke({ color: 0xffff00, width: 3 });
+                                meteor.x = this.monsterSprite.x + 150;
+                                meteor.y = this.monsterSprite.y - 200;
+                                this.container.addChild(meteor);
+
+                                tweenManager.to({
+                                    target: meteor,
+                                    props: { x: this.monsterSprite.x, y: this.monsterSprite.y },
+                                    duration: 200, // Faster meteor
+                                    easing: Easing.easeInQuad,
+                                    onComplete: () => {
+                                        this.container.removeChild(meteor);
+                                        meteor.destroy();
+                                        AudioUtils.playExplosion();
+                                        this.spawnParticles(this.monsterSprite.x, this.monsterSprite.y, 0xff4400, 40);
+                                    }
+                                });
                             }
 
                             // Slash projectile
