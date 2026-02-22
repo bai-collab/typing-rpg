@@ -357,7 +357,6 @@ export class CombatScene extends Scene {
 
         // Mode Specific Targets & Time
         const alphabet = "ABCDEFGHIJ";
-        const allLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         this.targetQueue = [];
         this.targetQueueIndex = 0;
@@ -370,12 +369,13 @@ export class CombatScene extends Scene {
             this.targetQueue.push({ text: newWord });
             this.timeLimit = Math.max(6, 8 - (Math.min(5, this.level - 1) * 0.4));
         } else if (this.mode === 'Intermediate') {
-            let newWord = "";
-            for (let i = 0; i < 10; i++) {
-                newWord += allLetters.charAt(Math.floor(Math.random() * allLetters.length));
+            // 5 random words, simplified advanced
+            for (let i = 0; i < 5; i++) {
+                const wordData = VOCABULARY[Math.floor(Math.random() * VOCABULARY.length)];
+                this.targetQueue.push({ text: wordData.word.toLowerCase(), wordData });
             }
-            this.targetQueue.push({ text: newWord });
-            this.timeLimit = Math.max(5, 6 - (Math.min(3, this.level - 1) * 0.33));
+            this.targetQueue.sort(() => Math.random() - 0.5);
+            this.timeLimit = 25;
         } else if (this.mode === 'Advanced') {
             // 5 random words
             for (let i = 0; i < 5; i++) {
@@ -429,7 +429,7 @@ export class CombatScene extends Scene {
         this.wordContainer.removeChildren();
         this.letterTexts = [];
 
-        if (this.mode !== 'Advanced') {
+        if (this.mode === 'Beginner') {
             const letterSpacing = 30;
             const fontSize = 40;
             const totalWidth = this.targetWord.length * letterSpacing;
@@ -563,7 +563,7 @@ export class CombatScene extends Scene {
             this.orbitGraphics.push(orbitText as any);
 
             if (this.typedIndex >= this.targetWord.length) {
-                if (this.mode === 'Advanced') this.resolveAdvancedTarget();
+                if (this.mode === 'Advanced' || this.mode === 'Intermediate') this.resolveAdvancedTarget();
                 else this.resolveCombat();
             }
         } else {
@@ -1201,7 +1201,7 @@ export class CombatScene extends Scene {
 
             if (this.timeLeft <= 0) {
                 this.timeLeft = 0;
-                if (this.mode === 'Advanced') this.resolveAdvancedTurnEnd();
+                if (this.mode === 'Advanced' || this.mode === 'Intermediate') this.resolveAdvancedTurnEnd();
                 else this.resolveCombat();
             }
 
