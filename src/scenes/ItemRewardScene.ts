@@ -1,6 +1,7 @@
 import { Text, TextStyle, Graphics, Container } from 'pixi.js';
 import { Scene } from './Scene';
-import { ItemSystem, type Item, type ItemRarity, ITEMS } from '../items/ItemSystem';
+import { ItemSystem, ITEMS } from '../items/ItemSystem';
+import type { Item, ItemRarity } from '../items/types';
 import { CloudSave } from '../utils/CloudSave';
 
 export class ItemRewardScene extends Scene {

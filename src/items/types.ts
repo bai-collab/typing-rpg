@@ -16,6 +16,7 @@ export interface IPlayerState {
     combo3DamageMultiplier: number;
     combo5DamageMultiplier: number;
     reviveCount: number;
+    reviveHpRatio: number;
     itemStacks: Record<string, number>;
     inventory: string[];
 }
