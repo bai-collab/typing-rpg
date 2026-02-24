@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-    base: '/typing-rpg/',
+    base: './',
     build: {
         outDir: 'dist',
     },

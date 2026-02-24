@@ -31,6 +31,7 @@ export class PlayerState implements IPlayerState {
 
     // Achievement Cosmetics
     public characterTint: number = 0x00aaff; // Default Blue
+    public errorWordStats: Record<string, number> = {};
 
     // Getters for Achievement Buffs (Passive)
     public get achievementAtkBonus(): number {
@@ -65,7 +66,8 @@ export class PlayerState implements IPlayerState {
             score: this.score,
             highestCombo: Math.max(this.highestCombo, currentCombo),
             inventory: this.inventory,
-            characterTint: this.characterTint
+            characterTint: this.characterTint,
+            errorWordStats: this.errorWordStats
         };
         localStorage.setItem('typingRpgSaveData', JSON.stringify(saveData));
     }
@@ -87,6 +89,7 @@ export class PlayerState implements IPlayerState {
             if (data.characterTint !== undefined) {
                 this.characterTint = data.characterTint;
             }
+            this.errorWordStats = data.errorWordStats || {};
 
             // Re-apply items to reconstruct stacks/multipliers
             this.applyInventory();
@@ -115,6 +118,7 @@ export class PlayerState implements IPlayerState {
         this.reviveCount = 0;
         this.reviveHpRatio = 0.5;
         this.itemStacks = {};
+        // Note: we DON'T reset errorWordStats here as it's meant to be persistent across games
     }
 
     public applyInventory() {

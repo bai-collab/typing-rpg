@@ -19,8 +19,7 @@ export class Game {
 
     public async init(container: HTMLElement) {
         await this.app.init({
-            width: 800,
-            height: 600,
+            resizeTo: window,
             backgroundColor: 0x1a1a24,
             resolution: window.devicePixelRatio || 1,
             autoDensity: true,

@@ -1,7 +1,7 @@
 import { Text, TextStyle } from 'pixi.js';
 import { Scene } from './Scene';
 import { AchievementSystem, ACHIEVEMENT_DEFINITIONS } from '../utils/AchievementSystem';
-import { LeaderboardSystem } from '../utils/LeaderboardSystem';
+import { CloudSave } from '../utils/CloudSave';
 
 export class MainMenuScene extends Scene {
     private titleText!: Text;
@@ -20,10 +20,10 @@ export class MainMenuScene extends Scene {
         if (savedData) {
             this.hasSaveData = true;
             this.savedLevel = savedData.level;
-            this.menuOptions = [`Resume (Lv.${this.savedLevel})`, 'Beginner', 'Intermediate', 'Advanced', 'Achievements', 'Leaderboard'];
+            this.menuOptions = [`繼續遊戲 (Lv.${this.savedLevel})`, '新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '成就系統', '排行榜'];
         } else {
             this.hasSaveData = false;
-            this.menuOptions = ['Beginner', 'Intermediate', 'Advanced', 'Achievements', 'Leaderboard'];
+            this.menuOptions = ['新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '成就系統', '排行榜'];
         }
 
         const style = new TextStyle({
@@ -40,8 +40,8 @@ export class MainMenuScene extends Scene {
 
         this.titleText = new Text({ text: 'TYPING RPG', style });
         this.titleText.anchor.set(0.5);
-        this.titleText.x = 400;
-        this.titleText.y = 150;
+        this.titleText.x = this.game.app.screen.width / 2;
+        this.titleText.y = this.game.app.screen.height * 0.25;
         this.container.addChild(this.titleText);
 
         const optionStyle = new TextStyle({
@@ -53,8 +53,8 @@ export class MainMenuScene extends Scene {
         this.menuOptions.forEach((option, index) => {
             const t = new Text({ text: option, style: optionStyle });
             t.anchor.set(0.5);
-            t.x = 400;
-            t.y = 260 + index * 45;
+            t.x = this.game.app.screen.width / 2;
+            t.y = this.game.app.screen.height * 0.43 + index * 45;
             this.optionsText.push(t);
             this.container.addChild(t);
         });
@@ -67,8 +67,8 @@ export class MainMenuScene extends Scene {
         });
         this.descriptionText = new Text({ text: '', style: descStyle });
         this.descriptionText.anchor.set(0.5);
-        this.descriptionText.x = 400;
-        this.descriptionText.y = 540;
+        this.descriptionText.x = this.game.app.screen.width / 2;
+        this.descriptionText.y = this.game.app.screen.height * 0.9;
         this.container.addChild(this.descriptionText);
 
         this.updateSelectionUI();
@@ -93,9 +93,9 @@ export class MainMenuScene extends Scene {
         if (this.hasSaveData && this.selectedIndex === 0) {
             this.descriptionText.text = "繼續上次的冒險旅程";
         } else {
-            if (modeIdx === 0) this.descriptionText.text = "只有字母，適合新手暖身";
+            if (modeIdx === 0) this.descriptionText.text = "無時間壓力，針對錯字加強練習";
             else if (modeIdx === 1) this.descriptionText.text = "練習單字 (預設 25秒)";
-            else if (modeIdx === 2) this.descriptionText.text = "練習單字 (地獄 5秒)";
+            else if (modeIdx === 2) this.descriptionText.text = "挑戰模式 (地獄 5秒)";
             else if (modeIdx === 3) this.descriptionText.text = "查看解鎖的成就";
             else if (modeIdx === 4) this.descriptionText.text = "查看本地前十名的高分紀錄";
         }
@@ -186,10 +186,8 @@ export class MainMenuScene extends Scene {
         document.getElementById('close-modal-btn')!.onclick = () => modalOverlay.remove();
     }
 
-    private showLeaderboardModal() {
+    private async showLeaderboardModal() {
         if (document.getElementById('typing-rpg-modal')) return;
-
-        const runs = LeaderboardSystem.getTopRuns();
 
         const modalOverlay = document.createElement('div');
         modalOverlay.id = 'typing-rpg-modal';
@@ -203,58 +201,102 @@ export class MainMenuScene extends Scene {
         Object.assign(modalBox.style, {
             backgroundColor: '#222', padding: '20px', borderRadius: '10px',
             color: 'white', fontFamily: 'Courier New, monospace',
-            width: '600px', maxHeight: '80%', overflowY: 'auto',
-            border: '2px solid #00ff00'
+            width: '650px', maxHeight: '85%', overflowY: 'auto',
+            border: '2px solid #00ff00', position: 'relative'
         });
 
-        let html = `<h2 style="color:#00ff00; text-align:center; margin-top:0;">本地排行榜 (Top 10)</h2>`;
+        modalBox.innerHTML = `<h2 style="color:#00ff00; text-align:center; margin-top:0;">雲端排行榜 (Class Leaderboard)</h2>
+                              <p style="text-align:center; color:#aaa;">正在連線至雲端試算表...</p>`;
 
-        if (runs.length === 0) {
-            html += `<p style="text-align:center; color:#aaa;">尚未有紀錄</p>`;
-        } else {
-            html += `<table style="width:100%; border-collapse:collapse; text-align:left;">
-                <tr style="border-bottom:1px solid #555;">
-                    <th style="padding:5px;">模式</th>
-                    <th>關卡</th>
-                    <th>正確率</th>
-                    <th>日期</th>
-                </tr>`;
-            for (const r of runs) {
-                const acc = (r.accuracy * 100).toFixed(1) + "%";
-                html += `
-                <tr style="border-bottom:1px solid #444;">
-                    <td style="padding:5px; color:#aaa;">${r.mode}</td>
-                    <td style="color:#fff; font-weight:bold;">Lv.${r.level}</td>
-                    <td style="color:${r.accuracy >= 1 ? '#0f0' : '#fff'};">${acc}</td>
-                    <td style="color:#888; font-size:12px;">${r.date}</td>
-                </tr>`;
-            }
-            html += `</table>`;
-        }
-
-        html += `
-        <div style="text-align:center; margin-top:20px; display:flex; justify-content:space-between;">
-            <button id="clear-ldr-btn" style="padding:10px 15px; font-size:14px; cursor:pointer; background:#800; color:#fff; border:none; border-radius:5px;">刪除紀錄</button>
-            <button id="close-modal-btn" style="padding:10px 20px; font-size:16px; cursor:pointer; background:#555; color:#fff; border:none; border-radius:5px;">關閉</button>
-        </div>`;
-
-        modalBox.innerHTML = html;
         modalOverlay.appendChild(modalBox);
         document.body.appendChild(modalOverlay);
 
-        document.getElementById('close-modal-btn')!.onclick = () => modalOverlay.remove();
-        document.getElementById('clear-ldr-btn')!.onclick = () => {
-            if (confirm("確定要刪除所有本地紀錄嗎？")) {
-                LeaderboardSystem.clearRuns();
-                modalOverlay.remove();
-                this.showLeaderboardModal(); // refresh
+        const data = await CloudSave.fetchGlobalLeaderboard();
+
+        const renderCategory = (mode: string) => {
+            const list = data ? data[mode] : [];
+            let tableHtml = `
+            <table style="width:100%; border-collapse:collapse; text-align:left; margin-top:10px;">
+                <tr style="border-bottom:1px solid #555; color:#0f0;">
+                    <th style="padding:8px 5px;">排名</th>
+                    <th>學號 (ID)</th>
+                    <th>關卡</th>
+                    <th>總分</th>
+                    <th>連擊</th>
+                </tr>`;
+
+            if (!list || list.length === 0) {
+                tableHtml += `<tr><td colspan="5" style="text-align:center; padding:20px; color:#666;">該模式尚未有紀錄</td></tr>`;
+            } else {
+                list.forEach((r, idx) => {
+                    tableHtml += `
+                    <tr style="border-bottom:1px solid #444;">
+                        <td style="padding:8px 5px; color:#ffd700;">#${idx + 1}</td>
+                        <td style="color:#fff; font-weight:bold;">${r.classId}</td>
+                        <td style="color:#aaa;">Lv.${r.level}</td>
+                        <td style="color:#0f0;">${r.score.toLocaleString()}</td>
+                        <td style="color:#888; font-size:12px;">${r.maxCombo}</td>
+                    </tr>`;
+                });
             }
+            tableHtml += `</table>`;
+            return tableHtml;
         };
+
+        const updateContent = (activeMode: string) => {
+            const tabs = ['Beginner', 'Intermediate', 'Advanced'];
+            const names: Record<string, string> = { 'Beginner': '新手練習', 'Intermediate': '進階練習', 'Advanced': '高階挑戰' };
+
+            let html = `<h2 style="color:#00ff00; text-align:center; margin-top:0;">雲端排行榜 (Class Leaderboard)</h2>`;
+
+            // Tab Menu
+            html += `<div style="display:flex; justify-content:center; gap:10px; margin-bottom:15px;">`;
+            tabs.forEach(m => {
+                const isActive = m === activeMode;
+                html += `<button class="ldr-tab" data-mode="${m}" style="padding:5px 15px; cursor:pointer; background:${isActive ? '#00ff00' : '#444'}; color:${isActive ? '#000' : '#eee'}; border:none; border-radius:4px; font-weight:bold;">${names[m]}</button>`;
+            });
+            html += `</div>`;
+
+            // Table Content
+            html += `<div id="ldr-table-container">${renderCategory(activeMode)}</div>`;
+
+            // Footer
+            html += `
+            <div style="text-align:center; margin-top:20px;">
+                <button id="close-modal-btn" style="padding:10px 20px; font-size:16px; cursor:pointer; background:#555; color:#fff; border:none; border-radius:5px;">關閉</button>
+            </div>`;
+
+            modalBox.innerHTML = html;
+
+            // Re-bind events
+            modalBox.querySelectorAll('.ldr-tab').forEach(btn => {
+                const b = btn as HTMLButtonElement;
+                b.onclick = () => updateContent(b.dataset.mode!);
+            });
+            document.getElementById('close-modal-btn')!.onclick = () => modalOverlay.remove();
+        };
+
+        updateContent('Beginner');
     }
 
     public update(_delta: number) {
         if (this.optionsText[this.selectedIndex]) {
             this.optionsText[this.selectedIndex].alpha = Math.sin(Date.now() / 200) * 0.3 + 0.7;
+        }
+    }
+
+    public onResize(width: number, height: number): void {
+        if (this.titleText) {
+            this.titleText.x = width / 2;
+            this.titleText.y = height * 0.25;
+        }
+        this.optionsText.forEach((t, index) => {
+            t.x = width / 2;
+            t.y = height * 0.43 + index * 45;
+        });
+        if (this.descriptionText) {
+            this.descriptionText.x = width / 2;
+            this.descriptionText.y = height * 0.9;
         }
     }
 

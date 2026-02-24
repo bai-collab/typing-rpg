@@ -38,8 +38,8 @@ export class ItemRewardScene extends Scene {
 
         this.titleText = new Text({ text: '關卡突破！請選擇一項戰利品', style: titleStyle });
         this.titleText.anchor.set(0.5);
-        this.titleText.x = 400;
-        this.titleText.y = 80;
+        this.titleText.x = this.game.app.screen.width / 2;
+        this.titleText.y = this.game.app.screen.height * 0.133; // 80/600
         this.container.addChild(this.titleText);
 
         const hintStyle = new TextStyle({
@@ -53,20 +53,22 @@ export class ItemRewardScene extends Scene {
 
         this.hintText = new Text({ text: '提示：後續的怪物會更強，攻擊力或保命手段都很重要！', style: hintStyle });
         this.hintText.anchor.set(0.5);
-        this.hintText.x = 400;
-        this.hintText.y = 500;
+        this.hintText.x = this.game.app.screen.width / 2;
+        this.hintText.y = this.game.app.screen.height * 0.833; // 500/600
         this.container.addChild(this.hintText);
 
         const cardWidth = 220;
         const cardHeight = 300;
         const gap = 30;
-        const startX = 400 - (cardWidth * 1.5) - gap;
+        const sw = this.game.app.screen.width;
+        const sh = this.game.app.screen.height;
+        const startX = sw / 2 - (cardWidth * 1.5) - gap;
 
         for (let i = 0; i < 3; i++) {
             const item = this.choices[i];
             const g = new Graphics();
             g.x = startX + i * (cardWidth + gap);
-            g.y = 150;
+            g.y = sh * 0.25; // 150/600
 
             this.cardGraphics.push(g);
             this.container.addChild(g);
@@ -161,14 +163,14 @@ export class ItemRewardScene extends Scene {
                 g.rect(0, 0, cardWidth, cardHeight).stroke({ color: 0xffffff, width: 4 });
 
                 // Float up slightly
-                g.y = 140;
+                g.y = this.game.app.screen.height * 0.233; // 140/600
                 this.cardTexts[i].y = g.y + cardHeight / 2;
             } else {
                 // Dimmed
                 g.rect(0, 0, cardWidth, cardHeight).fill({ color: 0x333333 });
                 g.rect(0, 0, cardWidth, cardHeight).stroke({ color: baseColor, width: 2 });
 
-                g.y = 150;
+                g.y = this.game.app.screen.height * 0.25; // 150/600
                 this.cardTexts[i].y = g.y + cardHeight / 2;
             }
         }
@@ -207,6 +209,29 @@ export class ItemRewardScene extends Scene {
             // Go back to combat
             this.game.scenes.switchTo('combat', { resume: true });
         }
+    }
+
+    public onResize(width: number, height: number): void {
+        if (this.titleText) {
+            this.titleText.x = width / 2;
+            this.titleText.y = height * 0.133;
+        }
+        if (this.hintText) {
+            this.hintText.x = width / 2;
+            this.hintText.y = height * 0.833;
+        }
+        const cardWidth = 220;
+        const gap = 30;
+        const startX = width / 2 - (cardWidth * 1.5) - gap;
+        this.cardGraphics.forEach((g, i) => {
+            g.x = startX + i * (cardWidth + gap);
+            // updateSelection handles y
+        });
+        this.cardTexts.forEach((t, i) => {
+            t.x = this.cardGraphics[i].x + cardWidth / 2;
+            // updateSelection handles y
+        });
+        this.updateSelection();
     }
 
     public update(_delta: number) {

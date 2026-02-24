@@ -27,8 +27,8 @@ export class GameOverScene extends Scene {
 
         const title = new Text({ text: 'GAME OVER', style });
         title.anchor.set(0.5);
-        title.x = 400;
-        title.y = 150;
+        title.x = this.game.app.screen.width / 2;
+        title.y = this.game.app.screen.height * 0.25;
         this.container.addChild(title);
 
         const summaryStyle = new TextStyle({
@@ -45,8 +45,8 @@ export class GameOverScene extends Scene {
             style: summaryStyle
         });
         this.summaryText.anchor.set(0.5);
-        this.summaryText.x = 400;
-        this.summaryText.y = 350;
+        this.summaryText.x = this.game.app.screen.width / 2;
+        this.summaryText.y = this.game.app.screen.height * 0.58; // 350/600
         this.container.addChild(this.summaryText);
 
         this.createHtmlOverlay();
@@ -58,7 +58,7 @@ export class GameOverScene extends Scene {
         this.htmlOverlay = document.createElement('div');
         this.htmlOverlay.id = 'game-over-overlay';
         Object.assign(this.htmlOverlay.style, {
-            position: 'absolute', top: '500px', left: '0', width: '100%',
+            position: 'absolute', top: '80%', left: '0', width: '100%',
             display: 'flex', justifyContent: 'center', gap: '20px', zIndex: '10'
         });
 
@@ -137,6 +137,21 @@ export class GameOverScene extends Scene {
         this.container.removeChildren();
         if (this.htmlOverlay) {
             this.htmlOverlay.remove();
+        }
+    }
+
+    public onResize(width: number, height: number): void {
+        if (this.summaryText) {
+            this.summaryText.x = width / 2;
+            this.summaryText.y = height * 0.58;
+        }
+        const title = this.container.children.find(c => c instanceof Text && c.text === 'GAME OVER') as Text;
+        if (title) {
+            title.x = width / 2;
+            title.y = height * 0.25;
+        }
+        if (this.htmlOverlay) {
+            this.htmlOverlay.style.top = (height * 0.8) + 'px';
         }
     }
 

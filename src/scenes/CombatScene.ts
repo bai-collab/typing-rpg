@@ -245,15 +245,17 @@ export class CombatScene extends Scene {
 
     private setupUI() {
         this.container.removeChildren(); // clear any previous UI if restarted
+        const sw = this.game.app.screen.width;
+        const sh = this.game.app.screen.height;
 
         // Draw entities
         this.heroSprite = this.drawHero();
-        this.heroSprite.x = 150;
-        this.heroSprite.y = 400;
+        this.heroSprite.x = sw * 0.1875; // 150/800
+        this.heroSprite.y = sh * 0.666;  // 400/600
 
         this.monsterSprite = this.drawMonster();
-        this.monsterSprite.x = 550;
-        this.monsterSprite.y = 370;
+        this.monsterSprite.x = sw * 0.6875; // 550/800
+        this.monsterSprite.y = sh * 0.616;  // 370/600
 
         const textStyle = new TextStyle({
             fontFamily: 'Courier New',
@@ -268,37 +270,37 @@ export class CombatScene extends Scene {
         this.heroHpText = new Text({ text: `Hero HP: ${this.heroHp}/${this.heroMaxHp}`, style: textStyle });
         this.heroHpText.anchor.set(0, 1);
         this.heroHpText.x = 20;
-        this.heroHpText.y = 580;
+        this.heroHpText.y = sh - 20;
 
         this.monsterHpText = new Text({ text: `Monster HP: -/-`, style: textStyle });
         this.monsterHpText.anchor.set(1, 1);
-        this.monsterHpText.x = 780;
-        this.monsterHpText.y = 580;
+        this.monsterHpText.x = sw - 20;
+        this.monsterHpText.y = sh - 20;
 
         this.wordContainer = new Container();
-        this.wordContainer.x = 400;
-        this.wordContainer.y = 250;
+        this.wordContainer.x = sw / 2;
+        this.wordContainer.y = sh * 0.416; // 250/600
 
         this.timerGraphics = new Graphics();
-        this.timerGraphics.x = 200;
-        this.timerGraphics.y = 300;
+        this.timerGraphics.x = sw / 2 - 200;
+        this.timerGraphics.y = sh / 2;
 
         this.feedbackText = new Text({ text: '', style: new TextStyle({ fontFamily: 'Courier New', fontSize: 36, fill: '#ffff00', align: 'center', dropShadow: { alpha: 0.8, color: '#000000', distance: 2, blur: 2 } }) });
         this.feedbackText.anchor.set(0.5);
-        this.feedbackText.x = 400;
-        this.feedbackText.y = 150;
+        this.feedbackText.x = sw / 2;
+        this.feedbackText.y = sh * 0.25; // 150/600
 
         // Combo UI
         this.comboContainer = new Container();
-        this.comboContainer.x = 400;
-        this.comboContainer.y = 100;
+        this.comboContainer.x = sw / 2;
+        this.comboContainer.y = sh * 0.166; // 100/600
         this.comboScoreText = new Text({ text: '', style: new TextStyle({ fontFamily: 'Courier New', fontSize: 48, fontWeight: 'bold', fill: '#00ffff', align: 'center', dropShadow: { alpha: 0.8, color: '#000000', distance: 3, blur: 3 } }) });
         this.comboScoreText.anchor.set(0.5);
         this.comboContainer.addChild(this.comboScoreText);
 
         // Flash Overlay
         this.flashOverlay = new Graphics();
-        this.flashOverlay.rect(0, 0, 800, 600).fill({ color: 0xffffff });
+        this.flashOverlay.rect(0, 0, sw, sh).fill({ color: 0xffffff });
         this.flashOverlay.alpha = 0;
 
         this.container.addChild(this.heroSprite);
@@ -381,18 +383,17 @@ export class CombatScene extends Scene {
         this.state = 'TYPING';
 
         // Mode Specific Targets & Time
-        const alphabet = "ABCDEFGHIJ";
 
         this.targetQueue = [];
         this.targetQueueIndex = 0;
 
         if (this.mode === 'Beginner') {
-            let newWord = "";
-            for (let i = 0; i < 10; i++) {
-                newWord += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+            // 5 words with weighting
+            for (let i = 0; i < 5; i++) {
+                const wordData = this.getWeightedWord();
+                this.targetQueue.push({ text: wordData.word.toLowerCase(), wordData });
             }
-            this.targetQueue.push({ text: newWord });
-            this.timeLimit = Math.max(6, 8 - (Math.min(5, this.level - 1) * 0.4));
+            this.timeLimit = 3600; // 1 hour, effectively no timer
         } else if (this.mode === 'Intermediate') {
             // 5 random words, simplified advanced
             for (let i = 0; i < 5; i++) {
@@ -549,7 +550,12 @@ export class CombatScene extends Scene {
             return;
         }
 
-        if (this.isPaused) return;
+        if (this.isPaused) {
+            if (e.key === 'm' || e.key === 'M') {
+                this.game.scenes.switchTo('menu');
+            }
+            return;
+        }
 
         if (this.state === 'GAME_OVER') {
             return;
@@ -592,13 +598,19 @@ export class CombatScene extends Scene {
             this.orbitGraphics.push(orbitText as any);
 
             if (this.typedIndex >= this.targetWord.length) {
-                if (this.mode === 'Advanced' || this.mode === 'Intermediate') this.resolveAdvancedTarget();
+                if (this.mode === 'Advanced' || this.mode === 'Intermediate' || this.mode === 'Beginner') this.resolveAdvancedTarget();
                 else this.resolveCombat();
             }
         } else {
             // Incorrect
             this.errors++;
             this.levelErrors++;
+
+            if (this.mode === 'Beginner' && this.targetQueue[this.targetQueueIndex]?.wordData) {
+                const word = this.targetQueue[this.targetQueueIndex].text;
+                this.game.playerState.errorWordStats[word] = (this.game.playerState.errorWordStats[word] || 0) + 1;
+            }
+
             this.currentCombo = 0; // Reset combo
             this.comboScoreText.text = '';
 
@@ -1003,7 +1015,13 @@ export class CombatScene extends Scene {
         if (this.currentCombo >= 3) comboMult *= p.combo3DamageMultiplier;
         if (this.currentCombo >= 5) comboMult *= p.combo5DamageMultiplier;
 
-        let rawDamage = Math.floor(baseOutput * this.heroAtk * comboMult * atkMult);
+        let weightBonus = 1.0;
+        if (this.mode === 'Beginner' && p.errorWordStats[item.text] > 0) {
+            weightBonus = 1.5; // Build up high damage for difficult words
+            buffPopup = (buffPopup ? buffPopup + " " : "") + "POWER UP!";
+        }
+
+        let rawDamage = Math.floor(baseOutput * this.heroAtk * comboMult * atkMult * weightBonus);
         let isCrit = false;
         if (Math.random() < p.critChance) {
             rawDamage *= 2;
@@ -1253,7 +1271,9 @@ export class CombatScene extends Scene {
         tweenManager.update(deltaMs);
 
         if (this.state === 'TYPING') {
-            this.timeLeft -= (delta / 60);
+            if (this.mode !== 'Beginner') {
+                this.timeLeft -= (delta / 60);
+            }
 
             if (this.timeLeft <= 0) {
                 this.timeLeft = 0;
@@ -1485,10 +1505,22 @@ export class CombatScene extends Scene {
     private showPauseOverlay() {
         if (this.pauseOverlay) return;
 
+        this.renderPauseOverlay();
+    }
+
+    private renderPauseOverlay() {
+        if (this.pauseOverlay) {
+            this.container.removeChild(this.pauseOverlay);
+            this.pauseOverlay.destroy({ children: true });
+        }
+
+        const sw = this.game.app.screen.width;
+        const sh = this.game.app.screen.height;
+
         this.pauseOverlay = new Container();
 
         const bg = new Graphics();
-        bg.rect(0, 0, 800, 600).fill({ color: 0x000000, alpha: 0.6 });
+        bg.rect(0, 0, sw, sh).fill({ color: 0x000000, alpha: 0.6 });
         this.pauseOverlay.addChild(bg);
 
         const txt = new Text({
@@ -1502,9 +1534,28 @@ export class CombatScene extends Scene {
             })
         });
         txt.anchor.set(0.5);
-        txt.x = 400;
-        txt.y = 300;
+        txt.x = sw / 2;
+        txt.y = sh / 2;
         this.pauseOverlay.addChild(txt);
+
+        const menuTxt = new Text({
+            text: 'Press M to Return to Menu',
+            style: new TextStyle({
+                fontFamily: 'Courier New',
+                fontSize: 24,
+                fill: '#aaaaaa',
+                align: 'center'
+            })
+        });
+        menuTxt.anchor.set(0.5);
+        menuTxt.x = sw / 2;
+        menuTxt.y = sh / 2 + 80;
+        menuTxt.interactive = true;
+        menuTxt.cursor = 'pointer';
+        menuTxt.on('pointertap', () => {
+            this.game.scenes.switchTo('menu');
+        });
+        this.pauseOverlay.addChild(menuTxt);
 
         this.container.addChild(this.pauseOverlay);
     }
@@ -1515,5 +1566,66 @@ export class CombatScene extends Scene {
             this.pauseOverlay.destroy({ children: true });
             this.pauseOverlay = null;
         }
+    }
+
+    public onResize(width: number, height: number): void {
+        if (this.heroSprite) {
+            this.heroSprite.x = width * 0.1875;
+            this.heroSprite.y = height * 0.666;
+        }
+        if (this.monsterSprite) {
+            this.monsterSprite.x = width * 0.6875;
+            this.monsterSprite.y = height * 0.616;
+        }
+        if (this.heroHpText) this.heroHpText.y = height - 20;
+        if (this.monsterHpText) {
+            this.monsterHpText.x = width - 20;
+            this.monsterHpText.y = height - 20;
+        }
+        if (this.wordContainer) {
+            this.wordContainer.x = width / 2;
+            this.wordContainer.y = height * 0.416;
+        }
+        if (this.timerGraphics) {
+            this.timerGraphics.x = width / 2 - 200;
+            this.timerGraphics.y = height / 2;
+        }
+        if (this.feedbackText) {
+            this.feedbackText.x = width / 2;
+            this.feedbackText.y = height * 0.25;
+        }
+        if (this.comboContainer) {
+            this.comboContainer.x = width / 2;
+            this.comboContainer.y = height * 0.166;
+        }
+        if (this.flashOverlay) {
+            this.flashOverlay.clear().rect(0, 0, width, height).fill({ color: 0xffffff });
+        }
+        if (this.pauseOverlay) {
+            this.renderPauseOverlay(); // Redraw overlay
+        }
+    }
+
+    private getWeightedWord(): any {
+        const p = this.game.playerState;
+        // Simple weighting: words with errors get a much higher chance
+        // We'll pick a pool of candidates (e.g., 20) and then pick one with bias
+        const candidates: any[] = [];
+        for (let i = 0; i < 20; i++) {
+            const word = VOCABULARY[Math.floor(Math.random() * VOCABULARY.length)];
+            candidates.push(word);
+        }
+
+        // Add some "known difficult" words if they exist
+        const difficultWords = Object.keys(p.errorWordStats).filter(w => p.errorWordStats[w] > 0);
+        if (difficultWords.length > 0) {
+            for (let i = 0; i < 5; i++) {
+                const dw = difficultWords[Math.floor(Math.random() * difficultWords.length)];
+                const wordData = VOCABULARY.find(v => v.word.toLowerCase() === dw.toLowerCase());
+                if (wordData) candidates.push(wordData);
+            }
+        }
+
+        return candidates[Math.floor(Math.random() * candidates.length)];
     }
 }

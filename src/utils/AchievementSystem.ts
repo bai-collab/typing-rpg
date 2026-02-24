@@ -137,7 +137,8 @@ export class AchievementSystem {
     }
 
     // Handlers for combat events
-    public static onLevelComplete(_mode: string, accuracy: number, usedRevive: boolean, onUnlock: (a: AchievementDef) => void) {
+    public static onLevelComplete(mode: string, accuracy: number, usedRevive: boolean, onUnlock: (a: AchievementDef) => void) {
+        if (mode === 'Beginner') return; // Beginner mode doesn't count towards achievements
         const stats = this.loadStats();
 
         stats.totalLevels++;
@@ -156,7 +157,8 @@ export class AchievementSystem {
         this.checkUnlocks(stats, onUnlock);
     }
 
-    public static onComboUpdate(combo: number, onUnlock: (a: AchievementDef) => void) {
+    public static onComboUpdate(combo: number, onUnlock: (a: AchievementDef) => void, mode?: string) {
+        if (mode === 'Beginner') return;
         const stats = this.loadStats();
         if (combo > stats.maxCombo) {
             stats.maxCombo = combo;
@@ -165,7 +167,8 @@ export class AchievementSystem {
         }
     }
 
-    public static onWordTyped(word: string, onUnlock: (a: AchievementDef) => void) { // We track words generically or just for advanced, specs said Advanced but Intermediate uses words too. Let's allow both or stick to spec. Spec says "高階模式", but intermediate is basically same now. Let's strictly check mode if we want, or allow both. Let's allow both.
+    public static onWordTyped(word: string, onUnlock: (a: AchievementDef) => void, mode?: string) {
+        if (mode === 'Beginner') return;
 
         const stats = this.loadStats();
         const lower = word.toLowerCase();

@@ -14,6 +14,8 @@ function doPost(e) {
       return handleLoad(requestData);
     } else if (action === 'SAVE_PROGRESS') {
       return handleSave(requestData);
+    } else if (action === 'GET_LEADERBOARD') {
+      return handleGetLeaderboard(requestData);
     } else {
       return handleRecordMatch(requestData);
     }
@@ -90,6 +92,49 @@ function handleSave(data) {
   }
 
   return makeResponse({ status: 'success' });
+}
+
+function handleGetLeaderboard(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME_SAVES);
+  if (!sheet) return makeResponse({ status: 'not_found' });
+
+  const values = sheet.getDataRange().getValues();
+  const categories = {
+    'Beginner': [],
+    'Intermediate': [],
+    'Advanced': []
+  };
+
+  // Index 0: ClassID, 3: Level, 4: Mode, 7: Score, 8: MaxCombo, 2: Timestamp
+  for (let i = 1; i < values.length; i++) {
+    const mode = values[i][4] || 'Beginner';
+    const entry = {
+      classId: values[i][0],
+      level: values[i][3],
+      score: values[i][7],
+      maxCombo: values[i][8],
+      timestamp: values[i][2]
+    };
+    
+    if (categories[mode]) {
+      categories[mode].push(entry);
+    }
+  }
+
+  // Sort each category by Score desc, then Level desc
+  for (const mode in categories) {
+    categories[mode].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return b.level - a.level;
+    });
+    categories[mode] = categories[mode].slice(0, 10); // Top 10 per mode
+  }
+
+  return makeResponse({
+    status: 'success',
+    leaderboard: categories
+  });
 }
 
 function handleRecordMatch(data) {

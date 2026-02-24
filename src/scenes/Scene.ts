@@ -13,4 +13,5 @@ export abstract class Scene {
     public abstract enter(data?: any): void | Promise<void>;
     public abstract update(delta: number): void;
     public abstract exit(): void;
+    public onResize?(width: number, height: number): void;
 }

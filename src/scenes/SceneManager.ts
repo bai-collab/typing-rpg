@@ -19,6 +19,12 @@ export class SceneManager {
                 this.currentScene.update(ticker.deltaTime);
             }
         });
+
+        window.addEventListener('resize', () => {
+            if (this.currentScene && this.currentScene.onResize) {
+                this.currentScene.onResize(this.game.app.screen.width, this.game.app.screen.height);
+            }
+        });
     }
 
     public register(name: string, scene: Scene) {

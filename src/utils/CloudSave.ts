@@ -94,4 +94,29 @@ export class CloudSave {
         }
         return null;
     }
+
+    /**
+     * Fetches top 20 players from the global leaderboard (Google Sheets).
+     */
+    public static async fetchGlobalLeaderboard(): Promise<Record<string, any[]> | null> {
+        const { classId, pin, gasUrl } = this.getCredentials();
+        if (!gasUrl) return null;
+
+        const payload = { action: 'GET_LEADERBOARD', classId, pin };
+
+        try {
+            const response = await fetch(gasUrl, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            if (result.status === 'success' && result.leaderboard) {
+                return result.leaderboard;
+            }
+        } catch (e) {
+            console.error("CloudSave: Leaderboard fetch error:", e);
+        }
+        return null;
+    }
 }
