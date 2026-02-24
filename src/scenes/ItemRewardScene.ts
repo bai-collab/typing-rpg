@@ -70,6 +70,21 @@ export class ItemRewardScene extends Scene {
             g.x = startX + i * (cardWidth + gap);
             g.y = sh * 0.25; // 150/600
 
+            // Make interactive
+            g.interactive = true;
+            g.cursor = 'pointer';
+
+            g.on('pointerover', () => {
+                this.selectedIndex = i;
+                this.updateSelection();
+            });
+
+            g.on('pointertap', () => {
+                this.selectedIndex = i;
+                this.updateSelection();
+                this.selectItem(i);
+            });
+
             this.cardGraphics.push(g);
             this.container.addChild(g);
 
@@ -88,6 +103,7 @@ export class ItemRewardScene extends Scene {
             t.anchor.set(0.5);
             t.x = g.x + cardWidth / 2;
             t.y = g.y + cardHeight / 2;
+            t.interactive = false; // Let clicks pass to Graphics
             this.cardTexts.push(t);
             this.container.addChild(t);
         }
@@ -184,31 +200,35 @@ export class ItemRewardScene extends Scene {
             this.selectedIndex = Math.min(2, this.selectedIndex + 1);
             this.updateSelection();
         } else if (e.key === 'Enter') {
-            // Apply Item
-            const selectedItem = this.choices[this.selectedIndex];
-            ItemSystem.applyItem(selectedItem, this.game.playerState);
-
-            // Save progress with the new item 
-            const rawSave = localStorage.getItem('typingRpgSaveData');
-            if (rawSave) {
-                const savedData = JSON.parse(rawSave);
-                this.game.playerState.saveToStorage(savedData.level, savedData.mode, savedData.currentHp, 0);
-
-                // Cloud Sync
-                CloudSave.saveProgress({
-                    level: savedData.level,
-                    mode: savedData.mode,
-                    currentHp: savedData.currentHp,
-                    hpBase: this.game.playerState.hpBase,
-                    score: this.game.playerState.score,
-                    highestCombo: this.game.playerState.highestCombo,
-                    inventory: this.game.playerState.inventory
-                });
-            }
-
-            // Go back to combat
-            this.game.scenes.switchTo('combat', { resume: true });
+            this.selectItem(this.selectedIndex);
         }
+    }
+
+    private selectItem(index: number) {
+        // Apply Item
+        const selectedItem = this.choices[index];
+        ItemSystem.applyItem(selectedItem, this.game.playerState);
+
+        // Save progress with the new item 
+        const rawSave = localStorage.getItem('typingRpgSaveData');
+        if (rawSave) {
+            const savedData = JSON.parse(rawSave);
+            this.game.playerState.saveToStorage(savedData.level, savedData.mode, savedData.currentHp, 0);
+
+            // Cloud Sync
+            CloudSave.saveProgress({
+                level: savedData.level,
+                mode: savedData.mode,
+                currentHp: savedData.currentHp,
+                hpBase: this.game.playerState.hpBase,
+                score: this.game.playerState.score,
+                highestCombo: this.game.playerState.highestCombo,
+                inventory: this.game.playerState.inventory
+            });
+        }
+
+        // Go back to combat
+        this.game.scenes.switchTo('combat', { resume: true });
     }
 
     public onResize(width: number, height: number): void {
