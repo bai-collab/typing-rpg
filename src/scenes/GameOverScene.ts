@@ -84,10 +84,12 @@ export class GameOverScene extends Scene {
     }
 
     private async handleShare() {
+        const classId = localStorage.getItem('typingRpgClassId') || '無名戰士';
+
         // Create an offscreen div for html2canvas to render
         const shareDiv = document.createElement('div');
         Object.assign(shareDiv.style, {
-            position: 'absolute', top: '-9999px', left: '-9999px', width: '600px', height: '400px',
+            position: 'absolute', top: '-9999px', left: '-9999px', width: '600px', height: '450px',
             background: 'linear-gradient(135deg, #1a1a24 0%, #2a2a40 100%)',
             color: 'white', fontFamily: '"Microsoft JhengHei", Arial, sans-serif',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -95,17 +97,18 @@ export class GameOverScene extends Scene {
         });
 
         const accStr = (this.accuracy * 100).toFixed(1) + "%";
-        const copyText = `我在字母王國打字遊戲中 (${this.mode} 模式) 通關了第 ${this.level} 關！正確率 ${accStr}！你能超越我嗎？`;
+        const copyText = `我在打字 RPG 中 (${this.mode} 模式) 通關了第 ${this.level} 關！學員代號: ${classId}，你能超越我嗎？`;
 
         shareDiv.innerHTML = `
             <h1 style="color:#ffd700; font-size:40px; margin:10px 0;">Typing RPG</h1>
             <h2 style="color:#00ffff; font-size:28px; margin:5px 0;">挑戰紀錄</h2>
-            <div style="background:rgba(0,0,0,0.5); padding:20px; border-radius:10px; margin-top:20px; text-align:center;">
-                <p style="font-size:24px; margin:5px 0;">難度: <span style="color:#ffaa00;">${this.mode}</span></p>
+            <div style="font-size:18px; color:#ffd700; margin-bottom:10px;">正式學員: ${classId}</div>
+            <div style="background:rgba(0,0,0,0.5); padding:20px; border-radius:10px; margin-top:10px; text-align:center; min-width:250px;">
+                <p style="font-size:22px; margin:5px 0;">難度: <span style="color:#ffaa00;">${this.mode}</span></p>
                 <p style="font-size:32px; margin:10px 0;">生存至 <span style="color:#00ff00; font-weight:bold;">Lv.${this.level}</span></p>
-                <p style="font-size:24px; margin:5px 0;">正確率: <span style="color:#ff00ff;">${accStr}</span></p>
+                <p style="font-size:22px; margin:5px 0;">正確率: <span style="color:#ff00ff;">${accStr}</span></p>
             </div>
-            <p style="margin-top:30px; font-size:16px; color:#aaa;">Can you beat my score?</p>
+            <p style="margin-top:20px; font-size:16px; color:#aaa;">Can you beat my score?</p>
         `;
 
         document.body.appendChild(shareDiv);
