@@ -55,6 +55,22 @@ export class MainMenuScene extends Scene {
             t.anchor.set(0.5);
             t.x = this.game.app.screen.width / 2;
             t.y = this.game.app.screen.height * 0.43 + index * 45;
+
+            // Make interactive for touch/mouse
+            t.interactive = true;
+            t.cursor = 'pointer';
+
+            t.on('pointerover', () => {
+                this.selectedIndex = index;
+                this.updateSelectionUI();
+            });
+
+            t.on('pointertap', () => {
+                this.selectedIndex = index;
+                this.updateSelectionUI();
+                this.executeSelection();
+            });
+
             this.optionsText.push(t);
             this.container.addChild(t);
         });
@@ -110,26 +126,30 @@ export class MainMenuScene extends Scene {
             this.selectedIndex = (this.selectedIndex + 1) % this.menuOptions.length;
             this.updateSelectionUI();
         } else if (e.key === 'Enter') {
-            if (document.getElementById('typing-rpg-modal')) return;
+            this.executeSelection();
+        }
+    }
 
-            if (this.hasSaveData && this.selectedIndex === 0) {
-                // Resume
-                this.game.scenes.switchTo('combat', { fromResume: true });
+    private executeSelection() {
+        if (document.getElementById('typing-rpg-modal')) return;
+
+        if (this.hasSaveData && this.selectedIndex === 0) {
+            // Resume
+            this.game.scenes.switchTo('combat', { fromResume: true });
+        } else {
+            const modeIdx = this.hasSaveData ? this.selectedIndex - 1 : this.selectedIndex;
+
+            if (modeIdx === 3) {
+                this.showAchievementsModal();
+            } else if (modeIdx === 4) {
+                this.showLeaderboardModal();
+            } else if (modeIdx === 5) {
+                this.showHelpModal();
             } else {
-                const modeIdx = this.hasSaveData ? this.selectedIndex - 1 : this.selectedIndex;
-
-                if (modeIdx === 3) {
-                    this.showAchievementsModal();
-                } else if (modeIdx === 4) {
-                    this.showLeaderboardModal();
-                } else if (modeIdx === 5) {
-                    this.showHelpModal();
-                } else {
-                    // New Game
-                    const selectedMode = ['Beginner', 'Intermediate', 'Advanced'][modeIdx];
-                    import('../PlayerState').then(m => m.PlayerState.clearStorage());
-                    this.game.scenes.switchTo('combat', { mode: selectedMode });
-                }
+                // New Game
+                const selectedMode = ['Beginner', 'Intermediate', 'Advanced'][modeIdx];
+                import('../PlayerState').then(m => m.PlayerState.clearStorage());
+                this.game.scenes.switchTo('combat', { mode: selectedMode });
             }
         }
     }
