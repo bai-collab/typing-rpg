@@ -199,6 +199,12 @@ export class LoginScene extends Scene {
                 <li>🐾 (動物/昆蟲)：狂暴狀態 (傷害狂飆)</li>
                 <li>🍃 (天氣/自然)：獲得 3 回合持續回血</li>
             </ul>
+            <h3>系統控制 (Controls)</h3>
+            <ul>
+                <li><strong>ESC：</strong>暫停遊戲 / 開啟暫停選單。</li>
+                <li><strong>M 鍵：</strong>在暫停選單中按下可直接「退回主選單」。</li>
+                <li><strong>行動裝置：</strong>點擊畫面任何地方即可喚起虛擬鍵盤。</li>
+            </ul>
             <button id="close-help-btn" style="margin-top:20px; padding:10px 20px; background:#f44336; color:white; border:none; border-radius:6px; cursor:pointer; font-size:16px;">關閉說明</button>
         `;
 

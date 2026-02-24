@@ -20,10 +20,10 @@ export class MainMenuScene extends Scene {
         if (savedData) {
             this.hasSaveData = true;
             this.savedLevel = savedData.level;
-            this.menuOptions = [`繼續遊戲 (Lv.${this.savedLevel})`, '新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '成就系統', '排行榜'];
+            this.menuOptions = [`繼續遊戲 (Lv.${this.savedLevel})`, '新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '成就系統', '排行榜', '遊戲說明'];
         } else {
             this.hasSaveData = false;
-            this.menuOptions = ['新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '成就系統', '排行榜'];
+            this.menuOptions = ['新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '成就系統', '排行榜', '遊戲說明'];
         }
 
         const style = new TextStyle({
@@ -98,6 +98,7 @@ export class MainMenuScene extends Scene {
             else if (modeIdx === 2) this.descriptionText.text = "挑戰模式 (地獄 5秒)";
             else if (modeIdx === 3) this.descriptionText.text = "查看解鎖的成就";
             else if (modeIdx === 4) this.descriptionText.text = "查看本地前十名的高分紀錄";
+            else if (modeIdx === 5) this.descriptionText.text = "查看詳細的遊戲玩法與系統控制";
         }
     }
 
@@ -121,6 +122,8 @@ export class MainMenuScene extends Scene {
                     this.showAchievementsModal();
                 } else if (modeIdx === 4) {
                     this.showLeaderboardModal();
+                } else if (modeIdx === 5) {
+                    this.showHelpModal();
                 } else {
                     // New Game
                     const selectedMode = ['Beginner', 'Intermediate', 'Advanced'][modeIdx];
@@ -129,6 +132,56 @@ export class MainMenuScene extends Scene {
                 }
             }
         }
+    }
+
+    private showHelpModal() {
+        if (document.getElementById('typing-rpg-modal')) return;
+
+        const modalOverlay = document.createElement('div');
+        modalOverlay.id = 'typing-rpg-modal';
+        Object.assign(modalOverlay.style, {
+            position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: '1000'
+        });
+
+        const modalBox = document.createElement('div');
+        Object.assign(modalBox.style, {
+            backgroundColor: '#2a2a35', padding: '30px', borderRadius: '12px',
+            color: 'white', fontFamily: '"Microsoft JhengHei", Arial',
+            width: '600px', maxHeight: '80%', overflowY: 'auto',
+            border: '2px solid #4CAF50', lineHeight: '1.6'
+        });
+
+        modalBox.innerHTML = `
+            <h2 style="margin-top:0; color:#4CAF50; text-align:center;">遊戲說明 (How to Play)</h2>
+            <p>歡迎來到 Typing RPG！在這裡你需要透過打字來擊敗怪物。</p>
+            <h3>難度差異</h3>
+            <ul>
+                <li><strong>Beginner：</strong>只有隨機字母，容錯率高，節奏慢。</li>
+                <li><strong>Intermediate：</strong>練習單字，每回合給予 5 個單字，25秒倒數。</li>
+                <li><strong>Advanced：</strong>挑戰極限，每回合 5 個單字，只有 5秒倒數！</li>
+            </ul>
+            <h3>戰鬥系統與 Combo</h3>
+            <ul>
+                <li>連續輸入正確字元會累積 Combo，Combo 越高攻擊越高！全對會觸發 Perfect。</li>
+                <li>打錯字會重置 Combo，且影響結算準確率 (Accuracy)。</li>
+            </ul>
+            <h3>系統控制 (Controls)</h3>
+            <ul>
+                <li><strong>ESC：</strong>暫停遊戲 / 開啟暫停選單。</li>
+                <li><strong>M 鍵：</strong>在暫停選單中按下可直接「退回主選單」。</li>
+                <li><strong>行動裝置：</strong>點擊畫面任何地方即可喚起虛擬鍵盤。</li>
+            </ul>
+            <div style="text-align:center; margin-top:20px;">
+                <button id="close-modal-btn" style="padding:10px 20px; font-size:16px; cursor:pointer; background:#f44336; color:#fff; border:none; border-radius:5px;">關閉</button>
+            </div>
+        `;
+
+        modalOverlay.appendChild(modalBox);
+        document.body.appendChild(modalOverlay);
+
+        document.getElementById('close-modal-btn')!.onclick = () => modalOverlay.remove();
     }
 
     private showAchievementsModal() {

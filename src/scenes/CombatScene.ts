@@ -160,10 +160,13 @@ export class CombatScene extends Scene {
 
     private usedReviveThisLevel: boolean = false;
     private levelErrors: number = 0;
+    private mobileHintText: Text | null = null;
 
     private isInventoryExpanded: boolean = false;
     private isPaused: boolean = false;
     private pauseOverlay: Container | null = null;
+
+    private mobileInput: HTMLInputElement | null = null;
 
     public async enter(data?: any) {
         this.usedReviveThisLevel = false;
@@ -204,6 +207,7 @@ export class CombatScene extends Scene {
                 this.level = 1;
 
                 this.setupUI();
+                this.addMobileHint();
                 this.setupMonster();
                 this.startTurn();
             }
@@ -216,6 +220,7 @@ export class CombatScene extends Scene {
             this.levelBuffs = { atkBonus: 0, defBonus: 0, berserkActive: false, regenTurnsRemaining: 0 };
 
             this.setupUI();
+            this.addMobileHint();
             this.setupMonster();
             this.startTurn();
         }
@@ -224,7 +229,57 @@ export class CombatScene extends Scene {
         this.game.playerState.saveToStorage(this.level, this.mode, this.heroHp, 0);
 
         window.addEventListener('keydown', this.handleKeyDown);
+
+        this.createMobileInput();
+        window.addEventListener('pointerdown', this.handlePointerDown);
     }
+
+    private addMobileHint() {
+        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        if (isTouch) {
+            this.mobileHintText = new Text({
+                text: '(Tap screen to show keyboard)',
+                style: new TextStyle({ fontFamily: 'Arial', fontSize: 14, fill: '#666', fontStyle: 'italic' })
+            });
+            this.mobileHintText.anchor.set(0.5);
+            this.mobileHintText.x = this.game.app.screen.width / 2;
+            this.mobileHintText.y = this.game.app.screen.height - 30;
+            this.container.addChild(this.mobileHintText);
+        }
+    }
+
+    private createMobileInput() {
+        if (this.mobileInput) return;
+        this.mobileInput = document.createElement('input');
+        this.mobileInput.type = 'text';
+        this.mobileInput.style.position = 'absolute';
+        this.mobileInput.style.opacity = '0';
+        this.mobileInput.style.pointerEvents = 'none';
+        this.mobileInput.style.zIndex = '-1';
+        this.mobileInput.style.top = '0';
+        this.mobileInput.style.left = '0';
+        this.mobileInput.setAttribute('autocapitalize', 'none');
+        this.mobileInput.setAttribute('autocorrect', 'off');
+
+        document.body.appendChild(this.mobileInput);
+        this.mobileInput.addEventListener('input', this.handleMobileInput);
+    }
+
+    private handleMobileInput = (e: Event) => {
+        const input = e.target as HTMLInputElement;
+        const value = input.value;
+        if (value.length > 0) {
+            const char = value[value.length - 1];
+            this.processInput(char);
+            input.value = ''; // clear for next char
+        }
+    };
+
+    private handlePointerDown = () => {
+        if (this.mobileInput && this.state === 'TYPING' && !this.isPaused) {
+            this.mobileInput.focus();
+        }
+    };
 
     private applyPlayerStats() {
         const p = this.game.playerState;
@@ -563,16 +618,20 @@ export class CombatScene extends Scene {
 
         if (this.state !== 'TYPING') return;
 
-        // Ensure audio context is started on user interaction
-        if (e.key) {
-            AudioUtils['init']?.(); // Ensure audio context is ready on first keypress
-        }
-
         // Ignore modifiers
         if (e.ctrlKey || e.altKey || e.metaKey || e.key.length > 1) return;
 
+        this.processInput(e.key);
+    };
+
+    private processInput(key: string) {
+        if (this.state !== 'TYPING' || this.isPaused) return;
+
+        // Ensure audio context is started on user interaction
+        AudioUtils['init']?.();
+
         const expectedchar = this.targetWord[this.typedIndex];
-        if (e.key.toUpperCase() === expectedchar.toUpperCase()) {
+        if (key.toUpperCase() === expectedchar.toUpperCase()) {
             // Correct
             this.letterTexts[this.typedIndex].style.fill = '#00ff00';
             const pitch = 1.0 + (this.currentCombo * 0.05);
@@ -1305,6 +1364,14 @@ export class CombatScene extends Scene {
         this.hidePauseOverlay();
         this.container.removeChildren();
         window.removeEventListener('keydown', this.handleKeyDown);
+        window.removeEventListener('pointerdown', this.handlePointerDown);
+
+        if (this.mobileInput) {
+            this.mobileInput.removeEventListener('input', this.handleMobileInput);
+            document.body.removeChild(this.mobileInput);
+            this.mobileInput = null;
+        }
+
         tweenManager.clear();
         this.orbitGraphics.forEach(g => g.destroy());
         this.orbitGraphics = [];
