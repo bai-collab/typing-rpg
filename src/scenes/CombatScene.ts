@@ -432,6 +432,7 @@ export class CombatScene extends Scene {
         if (!this.isInventoryExpanded || keys.length === 0) return;
 
         let yOffset = 25;
+        let shownReviveCount = false;
         keys.forEach(id => {
             const count = itemStacks[id];
             const itemDef = ITEMS.find(i => i.id === id);
@@ -442,8 +443,9 @@ export class CombatScene extends Scene {
             if (itemDef.rarity === 'SSR') color = '#ffaa00';
 
             let itemStr = `${itemDef.name} x${count}`;
-            if (itemDef.type === 'Charm') {
-                itemStr += ` (剩餘 ${this.game.playerState.reviveCount} 次)`;
+            if (itemDef.type === 'Charm' && !shownReviveCount) {
+                itemStr += ` (全護符剩餘 ${this.game.playerState.reviveCount} 次復活)`;
+                shownReviveCount = true;
             }
 
             const itemText = new Text({
@@ -1236,7 +1238,22 @@ export class CombatScene extends Scene {
                                     this.monsterSprite.scale.set(1);
 
                                     if (this.heroHp <= 0) {
-                                        setTimeout(() => this.executeGameOver(), 500);
+                                        // Check for revive
+                                        if (this.game.playerState.reviveCount > 0) {
+                                            this.game.playerState.reviveCount--;
+                                            this.usedReviveThisLevel = true;
+                                            const restoreHp = Math.floor(this.heroMaxHp * this.game.playerState.reviveHpRatio);
+                                            this.heroHp = restoreHp;
+                                            this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 40, `復活! +${restoreHp} HP`, '#00ff88');
+                                            this.spawnParticles(this.heroSprite.x, this.heroSprite.y, 0x00ff88, 30);
+                                            this.feedbackText.text = `護符發動! (剩餘 ${this.game.playerState.reviveCount} 次)`;
+                                            this.feedbackText.style.fill = '#00ff88';
+                                            this.updateUI();
+                                            this.renderItems();
+                                            setTimeout(() => this.startTurn(), 1000);
+                                        } else {
+                                            setTimeout(() => this.executeGameOver(), 500);
+                                        }
                                     } else {
                                         // Auto refresh turn
                                         this.startTurn();

@@ -139,6 +139,7 @@ export class ItemRewardScene extends Scene {
         this.itemsContainer.addChild(titleText);
 
         let yOffset = 25;
+        let shownReviveCount = false;
         keys.forEach(id => {
             const count = itemStacks[id];
             const itemDef = ITEMS.find(i => i.id === id);
@@ -149,8 +150,9 @@ export class ItemRewardScene extends Scene {
             if (itemDef.rarity === 'SSR') color = '#ffaa00';
 
             let itemStr = `${itemDef.name} x${count}`;
-            if (itemDef.type === 'Charm') {
-                itemStr += ` (剩餘 ${this.game.playerState.reviveCount} 次)`;
+            if (itemDef.type === 'Charm' && !shownReviveCount) {
+                itemStr += ` (全護符剩餘 ${this.game.playerState.reviveCount} 次復活)`;
+                shownReviveCount = true;
             }
 
             const itemText = new Text({
