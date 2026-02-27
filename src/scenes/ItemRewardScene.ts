@@ -3,6 +3,7 @@ import { Scene } from './Scene';
 import { ItemSystem, ITEMS } from '../items/ItemSystem';
 import type { Item, ItemRarity } from '../items/types';
 import { CloudSave } from '../utils/CloudSave';
+import { AchievementSystem } from '../utils/AchievementSystem';
 
 export class ItemRewardScene extends Scene {
     private titleText!: Text;
@@ -205,9 +206,11 @@ export class ItemRewardScene extends Scene {
     }
 
     private selectItem(index: number) {
-        // Apply Item
         const selectedItem = this.choices[index];
         ItemSystem.applyItem(selectedItem, this.game.playerState);
+        AchievementSystem.onItemCollected(selectedItem.id, () => {
+            // Achievement stats updated
+        });
 
         // Save progress with the new item 
         const rawSave = localStorage.getItem('typingRpgSaveData');
@@ -222,8 +225,19 @@ export class ItemRewardScene extends Scene {
                 currentHp: savedData.currentHp,
                 hpBase: this.game.playerState.hpBase,
                 score: this.game.playerState.score,
+                gold: this.game.playerState.gold,
                 highestCombo: this.game.playerState.highestCombo,
-                inventory: this.game.playerState.inventory
+                inventory: this.game.playerState.inventory,
+                heroType: this.game.playerState.heroType,
+                characterTint: this.game.playerState.characterTint,
+                errorWordStats: this.game.playerState.errorWordStats,
+                shopPurchases: this.game.playerState.shopPurchases,
+                consumables: this.game.playerState.consumables,
+                goldBoostPerm: this.game.playerState.goldBoostPerm,
+                scoreBoostPerm: this.game.playerState.scoreBoostPerm,
+                ssrDropBoost: this.game.playerState.ssrDropBoost,
+                cosmetics: this.game.playerState.cosmetics,
+                enhanceLevels: this.game.playerState.enhanceLevels,
             });
         }
 

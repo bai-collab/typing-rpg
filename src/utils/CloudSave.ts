@@ -5,6 +5,7 @@ export interface GameStats {
     maxCombo?: number;
     wordsTyped?: number;
     durationSeconds?: number;
+    goldEarned?: number;
     won: boolean;
 }
 
@@ -14,8 +15,19 @@ export interface PlayerSaveData {
     currentHp: number;
     hpBase: number;
     score: number;
+    gold: number;
     highestCombo: number;
     inventory: string[];
+    heroType?: string;
+    characterTint?: number;
+    errorWordStats?: Record<string, number>;
+    shopPurchases?: Record<string, number>;
+    consumables?: string[];
+    goldBoostPerm?: number;
+    scoreBoostPerm?: number;
+    ssrDropBoost?: number;
+    cosmetics?: string[];
+    enhanceLevels?: Record<string, number>;
 }
 
 export class CloudSave {

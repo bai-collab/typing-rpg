@@ -6,6 +6,8 @@ import { tweenManager, Easing } from '../utils/Tween';
 import { VOCABULARY, type VocabWord } from '../data/Vocabulary';
 import { AchievementSystem, type AchievementDef } from '../utils/AchievementSystem';
 import { LeaderboardSystem } from '../utils/LeaderboardSystem';
+import { HeroFactory } from '../heroes/HeroFactory';
+import { applyShopPermanents, applyConsumables } from '../shop/ShopData';
 
 interface TargetItem {
     text: string;
@@ -98,6 +100,22 @@ class AudioUtils {
 
         noise.start();
     }
+
+    public static playHit() {
+        this.init();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.1);
+    }
 }
 
 export class CombatScene extends Scene {
@@ -160,6 +178,9 @@ export class CombatScene extends Scene {
 
     private usedReviveThisLevel: boolean = false;
     private levelErrors: number = 0;
+    private tookDamageThisLevel: boolean = false;
+    private typedCharsThisLevel: number = 0;
+    private startTimeThisLevel: number = 0;
     private mobileHintText: Text | null = null;
 
     private isInventoryExpanded: boolean = false;
@@ -171,6 +192,11 @@ export class CombatScene extends Scene {
     public async enter(data?: any) {
         this.usedReviveThisLevel = false;
         this.levelErrors = 0;
+        this.tookDamageThisLevel = false;
+        this.typedCharsThisLevel = 0;
+        this.startTimeThisLevel = Date.now();
+        this.state = 'STARTING';
+        if (data?.level) this.level = data.level;
         this.isInventoryExpanded = false;
         this.isPaused = false;
         if (this.pauseOverlay) {
@@ -191,6 +217,7 @@ export class CombatScene extends Scene {
 
                 // Re-apply item buffs
                 await this.game.playerState.applyInventory();
+                applyShopPermanents(this.game.playerState);
                 this.applyPlayerStats();
 
                 this.setupUI();
@@ -199,9 +226,12 @@ export class CombatScene extends Scene {
             } else {
                 // Fresh Start
                 this.mode = data?.mode || 'Beginner';
+                this.game.playerState.resetBuffs();
                 this.game.playerState.inventory = [];
                 this.game.playerState.score = 0;
                 this.game.playerState.highestCombo = 0;
+                applyShopPermanents(this.game.playerState);
+                applyConsumables(this.game.playerState);
                 this.applyPlayerStats();
                 this.heroHp = this.heroMaxHp;
                 this.level = 1;
@@ -232,6 +262,9 @@ export class CombatScene extends Scene {
 
         this.createMobileInput();
         window.addEventListener('pointerdown', this.handlePointerDown);
+
+        // Start idle animations
+        this.animateCharacters();
     }
 
     private addMobileHint() {
@@ -304,7 +337,7 @@ export class CombatScene extends Scene {
         const sh = this.game.app.screen.height;
 
         // Draw entities
-        this.heroSprite = this.drawHero();
+        this.heroSprite = HeroFactory.drawHero(this.game.playerState.heroType, sh);
         this.heroSprite.x = sw * 0.1875; // 150/800
         this.heroSprite.y = sh * 0.666;  // 400/600
 
@@ -369,6 +402,8 @@ export class CombatScene extends Scene {
         this.container.addChild(this.comboContainer);
         this.container.addChild(this.flashOverlay);
 
+        // HeroFactory already handles idle glow effects
+
         // Draw acquired items
         this.itemsContainer = new Container();
         this.itemsContainer.x = 20;
@@ -431,7 +466,7 @@ export class CombatScene extends Scene {
         this.monsterMaxHp = Math.floor(100 * multiplier);
         this.monsterHp = this.monsterMaxHp;
         this.monsterAtk = Math.max(5, Math.floor(5 * multiplier));
-        this.monsterDef = Math.max(1, Math.floor(1 * multiplier));
+        this.monsterDef = Math.max(1, Math.floor(Math.pow(1.39, this.level - 1)));
     }
 
     private startTurn() {
@@ -639,6 +674,7 @@ export class CombatScene extends Scene {
             this.spawnParticles(this.letterTexts[this.typedIndex].x + this.wordContainer.x, this.letterTexts[this.typedIndex].y + this.wordContainer.y, 0x00ff00, 5);
             this.typedIndex++;
             this.currentCombo++;
+            this.typedCharsThisLevel++;
             this.game.playerState.highestCombo = Math.max(this.game.playerState.highestCombo, this.currentCombo);
             AchievementSystem.onComboUpdate(this.currentCombo, this.showAchievementUnlock.bind(this));
 
@@ -718,122 +754,7 @@ export class CombatScene extends Scene {
         });
     }
 
-    private executeMonsterCounter() {
-        const p = this.game.playerState;
 
-        if (this.monsterHp <= 0) {
-            this.executeVictory();
-            return;
-        }
-
-        // Monster wind up
-        tweenManager.to({
-            target: this.monsterSprite,
-            props: { x: this.monsterSprite.x + 20 },
-            duration: 200,
-            easing: Easing.easeOutQuad,
-            onComplete: () => {
-                // Monster lunge
-                tweenManager.to({
-                    target: this.monsterSprite,
-                    props: { x: this.monsterSprite.x - 60 },
-                    duration: 100,
-                    easing: Easing.easeInQuad,
-                    onComplete: () => {
-                        let armor = this.heroDef * (1.0 + this.levelBuffs.defBonus);
-                        let monsterActualDmg = Math.max(1, Math.floor(this.monsterAtk - armor));
-                        if (p.hasCritShield && this.heroHp <= this.heroMaxHp * 0.2) {
-                            monsterActualDmg = 0;
-                            this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 30, "SHIELD", '#00aaff');
-                            p.hasCritShield = false;
-                        }
-                        this.heroHp -= monsterActualDmg;
-
-                        AudioUtils.playExplosion();
-                        this.spawnParticles(this.heroSprite.x + 25, this.heroSprite.y + 25, 0xff0000, 20);
-                        this.showDamageNumber(this.heroSprite.x + 25, this.heroSprite.y - 20, monsterActualDmg);
-
-                        // Screen Shake
-                        const shakeAmp = 10;
-                        tweenManager.to({
-                            target: this.container, props: { x: -shakeAmp }, duration: 50, onComplete: () => {
-                                tweenManager.to({
-                                    target: this.container, props: { x: shakeAmp }, duration: 50, onComplete: () => {
-                                        tweenManager.to({ target: this.container, props: { x: 0 }, duration: 50 });
-                                    }
-                                });
-                            }
-                        });
-
-                        if (p.reflectDamageRatio > 0 && monsterActualDmg > 0) {
-                            const reflect = Math.floor(monsterActualDmg * p.reflectDamageRatio);
-                            if (reflect > 0) {
-                                this.monsterHp -= reflect;
-                                this.showDamageNumber(this.monsterSprite.x + 40, this.monsterSprite.y, reflect);
-                            }
-                        }
-                        this.updateUI();
-
-                        // Monster return
-                        tweenManager.to({
-                            target: this.monsterSprite,
-                            props: { x: this.monsterSprite.x + 40 },
-                            duration: 300,
-                            easing: Easing.easeOutQuad,
-                            onComplete: () => {
-                                if (this.heroHp <= 0) {
-                                    if (p.reviveCount > 0) {
-                                        p.reviveCount--;
-                                        this.usedReviveThisLevel = true;
-                                        this.heroHp = Math.floor(this.heroMaxHp * p.reviveHpRatio);
-                                        this.feedbackText.text = `REVIVED!`;
-                                        this.feedbackText.style.fill = '#00ff00';
-                                        this.updateUI();
-                                        setTimeout(() => { this.startTurn(); }, 1500);
-                                    } else {
-                                        this.heroHp = 0;
-                                        this.updateUI();
-                                        this.state = 'GAME_OVER';
-                                        this.feedbackText.text = "GAME OVER";
-                                        this.feedbackText.style.fill = '#ff0000';
-
-                                        // Clear save on death
-                                        import('../PlayerState').then(m => m.PlayerState.clearStorage());
-
-                                        if (typeof CloudSave !== 'undefined') {
-                                            CloudSave.reportMatchResult({
-                                                mode: this.mode,
-                                                level: this.level,
-                                                score: p.score,
-                                                maxCombo: p.highestCombo,
-                                                won: false
-                                            });
-                                        }
-
-                                        const acc = this.levelErrors === 0 ? 1.0 : 0.0;
-                                        LeaderboardSystem.saveRun({
-                                            date: new Date().toLocaleDateString(),
-                                            level: this.level,
-                                            accuracy: acc,
-                                            mode: this.mode,
-                                            playTime: 0,
-                                            typedCount: p.score
-                                        });
-
-                                        setTimeout(() => {
-                                            this.game.scenes.switchTo('gameover', { mode: this.mode, level: this.level, accuracy: acc });
-                                        }, 1500);
-                                    }
-                                } else {
-                                    setTimeout(() => { if (this.monsterHp > 0) this.startTurn(); else this.executeVictory(); }, 500);
-                                }
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    }
 
     private resolveCombat() {
         this.state = 'RESOLVING';
@@ -898,6 +819,11 @@ export class CombatScene extends Scene {
                 isCrit = true;
                 feedback += " [CRIT!]";
                 feedbackColor = '#ff5555';
+                if (isCrit) {
+                    feedback += "CRIT! ";
+                    actualDamage = Math.floor(actualDamage * (2.0 + (this.currentCombo >= 100 ? 1.0 : 0))); // Combo 100 achievement bonus
+                    AchievementSystem.onCritTriggered(this.showAchievementUnlock.bind(this));
+                }
             }
             actualDamage = Math.max(1, rawDamage - this.monsterDef);
         }
@@ -955,58 +881,47 @@ export class CombatScene extends Scene {
                                 });
                             }
 
-                            // Slash projectile
-                            const slash = new Graphics();
-                            slash.moveTo(0, -20).lineTo(20, 0).lineTo(0, 20).stroke({ color: 0x00ffff, width: 4 });
-                            slash.x = this.heroSprite.x + 30;
-                            slash.y = this.heroSprite.y + 20;
-                            this.container.addChild(slash);
+                            // Slash projectile (hero-type specific)
+                            HeroFactory.createAttackEffect(this.game.playerState.heroType, this.container, this.heroSprite, this.monsterSprite.x, this.monsterSprite.y, this.currentCombo);
 
-                            tweenManager.to({
-                                target: slash,
-                                props: { x: this.monsterSprite.x },
-                                duration: 150,
-                                onComplete: () => {
-                                    this.container.removeChild(slash);
-                                    slash.destroy();
+                            // Delay damage to sync with HeroFactory's projectile
+                            setTimeout(() => {
+                                this.monsterHp -= actualDamage;
+                                AudioUtils.playExplosion();
+                                this.spawnParticles(this.monsterSprite.x + 40, this.monsterSprite.y + 40, isCrit ? 0xff5555 : 0xffaa00, accuracy === 1 ? 50 : 30);
 
-                                    this.monsterHp -= actualDamage;
-                                    AudioUtils.playExplosion();
-                                    this.spawnParticles(this.monsterSprite.x + 40, this.monsterSprite.y + 40, isCrit ? 0xff5555 : 0xffaa00, accuracy === 1 ? 50 : 30);
+                                this.showDamageNumber(this.monsterSprite.x + 40 + (Math.random() * 20 - 10), this.monsterSprite.y + (Math.random() * 20 - 10), actualDamage, isCrit ? '#ff0000' : '#ffffff');
 
-                                    this.showDamageNumber(this.monsterSprite.x + 40 + (Math.random() * 20 - 10), this.monsterSprite.y + (Math.random() * 20 - 10), actualDamage, isCrit ? '#ff0000' : '#ffffff');
-
-                                    if (healAmount > 0) {
-                                        this.heroHp = Math.min(this.heroMaxHp, this.heroHp + healAmount);
-                                        this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 20, "+" + healAmount, '#00ff00');
-                                    }
-                                    this.updateUI();
-
-                                    // Monster Shake
-                                    const mx = this.monsterSprite.x;
-                                    tweenManager.to({
-                                        target: this.monsterSprite, props: { x: mx + 15 }, duration: 50, onComplete: () => {
-                                            tweenManager.to({
-                                                target: this.monsterSprite, props: { x: mx - 15 }, duration: 50, onComplete: () => {
-                                                    tweenManager.to({ target: this.monsterSprite, props: { x: mx }, duration: 50 });
-                                                }
-                                            });
-                                        }
-                                    });
-
-                                    // Hero returns 
-                                    tweenManager.to({
-                                        target: this.heroSprite,
-                                        props: { x: this.heroSprite.x - 40 },
-                                        duration: 300,
-                                        easing: Easing.easeOutQuad,
-                                        onComplete: () => {
-                                            this.heroSprite.scale.set(1);
-                                            setTimeout(() => this.executeMonsterCounter(), 500);
-                                        }
-                                    });
+                                if (healAmount > 0) {
+                                    this.heroHp = Math.min(this.heroMaxHp, this.heroHp + healAmount);
+                                    this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 20, "+" + healAmount, '#00ff00');
                                 }
-                            });
+                                this.updateUI();
+
+                                // Monster Shake
+                                const mx = this.monsterSprite.x;
+                                tweenManager.to({
+                                    target: this.monsterSprite, props: { x: mx + 15 }, duration: 50, onComplete: () => {
+                                        tweenManager.to({
+                                            target: this.monsterSprite, props: { x: mx - 15 }, duration: 50, onComplete: () => {
+                                                tweenManager.to({ target: this.monsterSprite, props: { x: mx }, duration: 50 });
+                                            }
+                                        });
+                                    }
+                                });
+
+                                // Hero returns 
+                                tweenManager.to({
+                                    target: this.heroSprite,
+                                    props: { x: this.heroSprite.x - 40 },
+                                    duration: 300,
+                                    easing: Easing.easeOutQuad,
+                                    onComplete: () => {
+                                        this.heroSprite.scale.set(1);
+                                        setTimeout(() => this.executeMonsterCounter(), 500);
+                                    }
+                                });
+                            }, 200);
                         }
                     });
                 }
@@ -1112,126 +1027,115 @@ export class CombatScene extends Scene {
                     duration: 50,
                     easing: Easing.easeInQuad,
                     onComplete: () => {
-                        // Slash projectile
-                        const slash = new Graphics();
-                        slash.moveTo(0, -20).lineTo(20, 0).lineTo(0, 20).stroke({ color: 0x00ffff, width: 4 });
-                        slash.x = this.heroSprite.x + 30;
-                        slash.y = this.heroSprite.y + 20;
-                        this.container.addChild(slash);
+                        // Add attack effect (hero-type specific)
+                        HeroFactory.createAttackEffect(this.game.playerState.heroType, this.container, this.heroSprite, this.monsterSprite.x, this.monsterSprite.y, this.currentCombo);
 
-                        tweenManager.to({
-                            target: slash,
-                            props: { x: this.monsterSprite.x },
-                            duration: 100,
-                            onComplete: () => {
-                                this.container.removeChild(slash);
-                                slash.destroy();
+                        // Delay the damage application slightly to sync with the slash effect
+                        setTimeout(() => {
+                            this.monsterHp -= actualDamage;
+                            if (this.monsterHp < 0) this.monsterHp = 0;
 
-                                this.monsterHp -= actualDamage;
-                                if (this.monsterHp < 0) this.monsterHp = 0;
+                            AudioUtils.playExplosion();
+                            this.spawnParticles(this.monsterSprite.x + 40, this.monsterSprite.y + 40, isCrit ? 0xff5555 : 0xffaa00, 20);
+                            this.showDamageNumber(this.monsterSprite.x + 40 + (Math.random() * 20 - 10), this.monsterSprite.y + (Math.random() * 20 - 10), actualDamage, isCrit ? '#ff0000' : '#ffffff');
 
-                                AudioUtils.playExplosion();
-                                this.spawnParticles(this.monsterSprite.x + 40, this.monsterSprite.y + 40, isCrit ? 0xff5555 : 0xffaa00, 20);
-                                this.showDamageNumber(this.monsterSprite.x + 40 + (Math.random() * 20 - 10), this.monsterSprite.y + (Math.random() * 20 - 10), actualDamage, isCrit ? '#ff0000' : '#ffffff');
-
-                                if (healAmount > 0) {
-                                    this.heroHp = Math.min(this.heroMaxHp, this.heroHp + healAmount);
-                                    this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 20, "+" + healAmount, '#00ff00');
-                                }
-                                this.updateUI();
-
-                                // Monster Shake
-                                const mx = this.monsterSprite.x;
-                                tweenManager.to({
-                                    target: this.monsterSprite, props: { x: mx + 15 }, duration: 50, onComplete: () => {
-                                        tweenManager.to({
-                                            target: this.monsterSprite, props: { x: mx - 15 }, duration: 50, onComplete: () => {
-                                                tweenManager.to({ target: this.monsterSprite, props: { x: mx }, duration: 50 });
-                                            }
-                                        });
-                                    }
-                                });
-
-                                // Hero returns 
-                                tweenManager.to({
-                                    target: this.heroSprite,
-                                    props: { x: this.heroSprite.x - 20 },
-                                    duration: 150,
-                                    easing: Easing.easeOutQuad,
-                                    onComplete: () => {
-                                        this.heroSprite.scale.set(1);
-
-                                        if (this.monsterHp <= 0) {
-                                            setTimeout(() => this.executeVictory(), 500);
-                                            return;
-                                        }
-
-                                        // Advance Queue
-                                        this.targetQueueIndex++;
-                                        if (this.targetQueueIndex >= this.targetQueue.length) {
-                                            this.renderWord(); // Re-render to show completion of all
-
-                                            // Meteor Strike Logic (Completed all 5 words)
-                                            setTimeout(() => {
-                                                this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 40, "METEOR STRIKE!", '#ffaa00');
-                                                AudioUtils.playExplosion();
-
-                                                // Create a makeshift meteor
-                                                const meteor = new Graphics();
-                                                meteor.circle(0, 0, 15).fill({ color: 0xff4400 }).stroke({ color: 0xffff00, width: 3 });
-                                                meteor.x = this.monsterSprite.x + 150;
-                                                meteor.y = this.monsterSprite.y - 200;
-                                                this.container.addChild(meteor);
-
-                                                tweenManager.to({
-                                                    target: meteor,
-                                                    props: { x: this.monsterSprite.x + 40, y: this.monsterSprite.y + 40 },
-                                                    duration: 300,
-                                                    easing: Easing.easeInQuad,
-                                                    onComplete: () => {
-                                                        this.container.removeChild(meteor);
-                                                        meteor.destroy();
-                                                        AudioUtils.playExplosion();
-
-                                                        // Halve monster HP
-                                                        const meteorDmg = Math.floor(this.monsterHp / 2);
-                                                        this.monsterHp -= meteorDmg;
-
-                                                        this.spawnParticles(this.monsterSprite.x + 40, this.monsterSprite.y + 40, 0xff0000, 40);
-                                                        this.showDamageNumber(this.monsterSprite.x + 40, this.monsterSprite.y, meteorDmg, '#ff00ff');
-                                                        this.updateUI();
-
-                                                        // Screen Shake (Strong)
-                                                        const mShake = 20;
-                                                        tweenManager.to({
-                                                            target: this.container, props: { x: -mShake }, duration: 50, onComplete: () => {
-                                                                tweenManager.to({
-                                                                    target: this.container, props: { x: mShake }, duration: 50, onComplete: () => {
-                                                                        tweenManager.to({ target: this.container, props: { x: 0 }, duration: 50 });
-                                                                    }
-                                                                });
-                                                            }
-                                                        });
-
-                                                        if (this.monsterHp <= 0) {
-                                                            setTimeout(() => this.executeVictory(), 500);
-                                                        } else {
-                                                            setTimeout(() => this.resolveAdvancedTurnEnd(), 600);
-                                                        }
-                                                    }
-                                                });
-                                            }, 300);
-
-                                        } else {
-                                            this.targetWord = this.targetQueue[this.targetQueueIndex].text;
-                                            this.typedIndex = 0;
-                                            this.renderWord(); // Update active highlights
-                                            this.state = 'TYPING';
-                                        }
-                                    }
-                                });
+                            if (healAmount > 0) {
+                                this.heroHp = Math.min(this.heroMaxHp, this.heroHp + healAmount);
+                                this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 20, "+" + healAmount, '#00ff00');
                             }
-                        });
+                            this.updateUI();
+
+                            // Monster Shake
+                            const mx = this.monsterSprite.x;
+                            tweenManager.to({
+                                target: this.monsterSprite, props: { x: mx + 15 }, duration: 50, onComplete: () => {
+                                    tweenManager.to({
+                                        target: this.monsterSprite, props: { x: mx - 15 }, duration: 50, onComplete: () => {
+                                            tweenManager.to({ target: this.monsterSprite, props: { x: mx }, duration: 50 });
+                                        }
+                                    });
+                                }
+                            });
+
+                            // Hero returns
+                            tweenManager.to({
+                                target: this.heroSprite,
+                                props: { x: this.heroSprite.x - 20 },
+                                duration: 150,
+                                easing: Easing.easeOutQuad,
+                                onComplete: () => {
+                                    this.heroSprite.scale.set(1);
+
+                                    if (this.monsterHp <= 0) {
+                                        setTimeout(() => this.executeVictory(), 500);
+                                        return;
+                                    }
+
+                                    // Advance Queue
+                                    this.targetQueueIndex++;
+                                    if (this.targetQueueIndex >= this.targetQueue.length) {
+                                        this.renderWord(); // Re-render to show completion of all
+
+                                        // Meteor Strike Logic (Completed all 5 words)
+                                        setTimeout(() => {
+                                            this.showDamageNumber(this.heroSprite.x, this.heroSprite.y - 40, "METEOR STRIKE!", '#ffaa00');
+                                            AudioUtils.playExplosion();
+
+                                            // Create a makeshift meteor
+                                            const meteor = new Graphics();
+                                            meteor.circle(0, 0, 15).fill({ color: 0xff4400 }).stroke({ color: 0xffff00, width: 3 });
+                                            meteor.x = this.monsterSprite.x + 150;
+                                            meteor.y = this.monsterSprite.y - 200;
+                                            this.container.addChild(meteor);
+
+                                            tweenManager.to({
+                                                target: meteor,
+                                                props: { x: this.monsterSprite.x + 40, y: this.monsterSprite.y + 40 },
+                                                duration: 300,
+                                                easing: Easing.easeInQuad,
+                                                onComplete: () => {
+                                                    this.container.removeChild(meteor);
+                                                    meteor.destroy();
+                                                    AudioUtils.playExplosion();
+
+                                                    // Halve monster HP
+                                                    const meteorDmg = Math.floor(this.monsterHp / 2);
+                                                    this.monsterHp -= meteorDmg;
+
+                                                    this.spawnParticles(this.monsterSprite.x + 40, this.monsterSprite.y + 40, 0xff0000, 40);
+                                                    this.showDamageNumber(this.monsterSprite.x + 40, this.monsterSprite.y, meteorDmg, '#ff00ff');
+                                                    this.updateUI();
+
+                                                    // Screen Shake (Strong)
+                                                    const mShake = 20;
+                                                    tweenManager.to({
+                                                        target: this.container, props: { x: -mShake }, duration: 50, onComplete: () => {
+                                                            tweenManager.to({
+                                                                target: this.container, props: { x: mShake }, duration: 50, onComplete: () => {
+                                                                    tweenManager.to({ target: this.container, props: { x: 0 }, duration: 50 });
+                                                                }
+                                                            });
+                                                        }
+                                                    });
+
+                                                    if (this.monsterHp <= 0) {
+                                                        setTimeout(() => this.executeVictory(), 500);
+                                                    } else {
+                                                        setTimeout(() => this.resolveAdvancedTurnEnd(), 600);
+                                                    }
+                                                }
+                                            });
+                                        }, 300);
+
+                                    } else {
+                                        this.targetWord = this.targetQueue[this.targetQueueIndex].text;
+                                        this.typedIndex = 0;
+                                        this.renderWord(); // Update active highlights
+                                        this.state = 'TYPING';
+                                    }
+                                }
+                            });
+                        }, 100); // Delay damage by 100ms to sync with slash effect
                     }
                 });
             }
@@ -1242,6 +1146,19 @@ export class CombatScene extends Scene {
         this.state = 'RESOLVING';
 
         if (this.monsterHp <= 0) return;
+
+        // Time Bonus Damage logic
+        if (this.timeLeft > 0 && (this.mode === 'Advanced' || this.mode === 'Intermediate')) {
+            const timeBonusDmg = Math.floor(this.timeLeft * this.heroAtk * 2);
+            if (timeBonusDmg > 0) {
+                this.monsterHp -= timeBonusDmg;
+                if (this.monsterHp < 0) this.monsterHp = 0;
+                this.showDamageNumber(this.monsterSprite.x + 40, this.monsterSprite.y - 20, `TIME BONUS! ${timeBonusDmg}`, '#00ffff');
+                this.spawnParticles(this.monsterSprite.x + 40, this.monsterSprite.y + 40, 0x00ffff, 20);
+                this.updateUI();
+            }
+            this.timeLeft = 0; // Consume the time
+        }
 
         // Apply Natural Regen from buff
         if (this.levelBuffs.regenTurnsRemaining > 0) {
@@ -1255,12 +1172,103 @@ export class CombatScene extends Scene {
         setTimeout(() => this.executeMonsterCounter(), 500);
     }
 
+    private executeMonsterCounter() {
+        if (this.monsterHp <= 0) {
+            this.executeVictory();
+            return;
+        }
+
+        this.state = 'RESOLVING';
+
+        // Monster Attack Animation
+        tweenManager.to({
+            target: this.monsterSprite.scale,
+            props: { x: 1.1, y: 0.9 },
+            duration: 200,
+            easing: Easing.easeOutQuad,
+            onComplete: () => {
+                tweenManager.to({
+                    target: this.monsterSprite,
+                    props: { x: this.monsterSprite.x - 20 },
+                    duration: 100,
+                    easing: Easing.easeInQuad,
+                    onComplete: () => {
+                        // Monster projectile
+                        this.createSlimeProjectileEffect(this.heroSprite.x, this.heroSprite.y);
+
+                        // Calculate monster damage
+                        let monsterDamage = Math.max(1, this.monsterAtk - this.heroDef * (1 + this.levelBuffs.defBonus));
+                        if (this.levelBuffs.berserkActive) {
+                            monsterDamage *= 1.2; // Berserk makes you take more damage
+                        }
+                        monsterDamage = Math.floor(monsterDamage);
+
+                        // Delay damage application to sync with projectile
+                        setTimeout(() => {
+                            this.heroHp -= monsterDamage;
+                            this.tookDamageThisLevel = true;
+                            if (this.heroHp < 0) this.heroHp = 0;
+
+                            AudioUtils.playHit();
+                            this.spawnParticles(this.heroSprite.x, this.heroSprite.y, 0xff0000, 20);
+                            this.showDamageNumber(this.heroSprite.x + (Math.random() * 20 - 10), this.heroSprite.y - 20 + (Math.random() * 20 - 10), monsterDamage, '#ff0000');
+                            this.updateUI();
+
+                            // Hero Shake
+                            const hx = this.heroSprite.x;
+                            tweenManager.to({
+                                target: this.heroSprite, props: { x: hx - 10 }, duration: 50, onComplete: () => {
+                                    tweenManager.to({
+                                        target: this.heroSprite, props: { x: hx + 10 }, duration: 50, onComplete: () => {
+                                            tweenManager.to({ target: this.heroSprite, props: { x: hx }, duration: 50 });
+                                        }
+                                    });
+                                }
+                            });
+
+                            // Monster returns
+                            tweenManager.to({
+                                target: this.monsterSprite,
+                                props: { x: this.monsterSprite.x + 20 },
+                                duration: 150,
+                                easing: Easing.easeOutQuad,
+                                onComplete: () => {
+                                    this.monsterSprite.scale.set(1);
+
+                                    if (this.heroHp <= 0) {
+                                        setTimeout(() => this.executeGameOver(), 500);
+                                    } else {
+                                        // Auto refresh turn
+                                        this.startTurn();
+                                    }
+                                }
+                            });
+                        }, 300); // Delay damage by 300ms to sync with projectile effect
+                    }
+                });
+            }
+        });
+    }
+
     private executeVictory() {
         this.monsterHp = 0;
         this.heroHp = Math.min(this.heroMaxHp, this.heroHp + this.heroHeal); // Full clear        
 
         const accuracy = this.levelErrors === 0 ? 1.0 : 0.0;
-        AchievementSystem.onLevelComplete(this.mode, accuracy, this.usedReviveThisLevel, this.showAchievementUnlock.bind(this));
+        AchievementSystem.onLevelComplete(this.mode, accuracy, this.usedReviveThisLevel, this.tookDamageThisLevel, this.showAchievementUnlock.bind(this));
+
+        // Calculate gold reward
+        let goldReward = this.level * 10;
+        if (accuracy >= 1.0) goldReward = Math.floor(goldReward * 1.2);
+        const goldBonus = this.game.playerState.achievementGoldBonus;
+        goldReward = Math.floor(goldReward * (1.0 + goldBonus));
+
+        this.game.playerState.gold += goldReward;
+        AchievementSystem.onGoldEarned(goldReward, this.showAchievementUnlock.bind(this));
+
+        // Update lifetime stats (chars and time)
+        const timeSpent = Date.now() - this.startTimeThisLevel;
+        AchievementSystem.onStatsUpdate(this.typedCharsThisLevel, timeSpent, this.showAchievementUnlock.bind(this));
 
         // Save progress right after victory (LocalStorage Cache)
         this.game.playerState.saveToStorage(this.level, this.mode, this.heroHp, 0);
@@ -1272,14 +1280,26 @@ export class CombatScene extends Scene {
             currentHp: this.heroHp,
             hpBase: this.game.playerState.hpBase,
             score: this.game.playerState.score,
+            gold: this.game.playerState.gold,
             highestCombo: this.game.playerState.highestCombo,
-            inventory: this.game.playerState.inventory
+            inventory: this.game.playerState.inventory,
+            heroType: this.game.playerState.heroType,
+            characterTint: this.game.playerState.characterTint,
+            errorWordStats: this.game.playerState.errorWordStats,
+            shopPurchases: this.game.playerState.shopPurchases,
+            consumables: this.game.playerState.consumables,
+            goldBoostPerm: this.game.playerState.goldBoostPerm,
+            scoreBoostPerm: this.game.playerState.scoreBoostPerm,
+            ssrDropBoost: this.game.playerState.ssrDropBoost,
+            cosmetics: this.game.playerState.cosmetics,
+            enhanceLevels: this.game.playerState.enhanceLevels,
         });
 
         CloudSave.reportMatchResult({
             mode: this.mode,
             level: this.level,
             score: this.game.playerState.score,
+            goldEarned: goldReward,
             maxCombo: this.game.playerState.highestCombo,
             won: true
         });
@@ -1451,63 +1471,185 @@ export class CombatScene extends Scene {
         };
         Ticker.shared.add(animate);
     }
-    private drawHero(): Graphics {
-        const g = new Graphics();
-        const pSize = 6; // pixel multiplier
 
-        // 0=trans, 1=skin, 2=armor(gray), 3=dark iron, 4=sword(blue), 5=eye(black)
-        const colors = [0x000000, 0xffccaa, 0xcccccc, 0x666666, 0x00ffff, 0x000000];
-        const art = [
-            [0, 0, 2, 2, 2, 0, 0, 0],
-            [0, 2, 1, 5, 2, 0, 4, 0],
-            [0, 2, 2, 2, 2, 4, 4, 0],
-            [0, 0, 2, 3, 2, 4, 0, 0],
-            [0, 3, 2, 2, 2, 3, 4, 0],
-            [0, 3, 3, 3, 3, 3, 4, 4],
-            [0, 0, 3, 0, 3, 0, 0, 0],
-            [0, 0, 2, 0, 2, 0, 0, 0],
-        ];
-
-        for (let r = 0; r < 8; r++) {
-            for (let c = 0; c < 8; c++) {
-                const px = art[r][c];
-                if (px !== 0) {
-                    g.rect(c * pSize, r * pSize, pSize, pSize).fill({ color: colors[px] });
-                }
-            }
-        }
-        return g;
-    }
 
     private drawMonster(): Graphics {
         const g = new Graphics();
-
-        // Slime type monster, scales a bit via size or just draw generic slime
-        const pSize = 10;
-        // 0=trans, 1=dark red/green, 2=light body, 3=white eye, 4=pupil
-        const bodyColor = this.level > 10 ? 0xff4444 : 0x44ff44; // turn red after level 10
+        const pSize = 3;
+        const bodyBase = this.level > 10 ? 0xff4444 : 0x44ff44;
         const darkBody = this.level > 10 ? 0xaa0000 : 0x00aa00;
-        const colors = [0x000000, darkBody, bodyColor, 0xffffff, 0x000000];
-        const art = [
-            [0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 2, 2, 0, 0, 0],
-            [0, 0, 2, 2, 2, 2, 0, 0],
-            [0, 2, 3, 4, 2, 3, 4, 0],
-            [0, 2, 2, 2, 2, 2, 2, 0],
-            [1, 2, 2, 2, 2, 2, 2, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 0],
+        const lightBody = this.level > 10 ? 0xff8888 : 0x88ff88;
+        const outlineColor = this.level > 10 ? 0x660000 : 0x006600;
+        const accentColor = this.level > 15 ? 0xff00ff : 0xffff00;
+
+        const colors = [
+            0x000000, outlineColor, bodyBase, 0xffffff, 0x000000,
+            darkBody, lightBody, accentColor, 0x99ff99, 0xff9999,
+            0x77aa77, 0xaa7777
         ];
 
-        for (let r = 0; r < 8; r++) {
-            for (let c = 0; c < 8; c++) {
+        const secondaryHighlight = this.level > 10 ? 9 : 8;
+        const slimeTexture = this.level > 10 ? 11 : 10;
+
+        const art = [
+            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0],
+            [0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0],
+            [0, 0, 1, 2, 2, 2, 6, 6, 2, 2, 2, 2, 6, 6, 2, 2, 2, 1, 0, 0],
+            [0, 0, 1, 2, 2, 2, 6, 6, 2, 2, 2, 2, 6, 6, 2, 2, 2, 1, 0, 0],
+            [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],
+            [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0],
+            [1, 2, 2, 2, 2, 3, 3, 3, 4, 2, 2, 3, 3, 3, 4, 2, 2, 2, 2, 1],
+            [1, 2, 2, 2, 2, 3, 3, 3, 2, 7, 7, 2, 3, 3, 2, 2, 2, 2, 2, 1],
+            [1, 2, 2, 2, 2, 2, 3, 2, 7, 7, 7, 7, 2, 2, 2, 2, 2, 2, 2, 1],
+            [1, 2, 2, 2, 6, 6, 2, 7, 7, 7, 7, 7, 7, 2, 6, 6, 2, 2, 2, 1],
+            [1, 2, 2, 2, secondaryHighlight, 6, 2, 2, 7, 7, 7, 7, 2, 2, secondaryHighlight, 6, 2, 2, 2, 1],
+            [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+            [1, 5, 5, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5, 5, 1],
+            [1, 5, 5, 5, 2, 2, 2, slimeTexture, slimeTexture, 2, 2, slimeTexture, slimeTexture, 2, 2, 2, 5, 5, 5, 1],
+            [0, 1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 0],
+            [0, 1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 0],
+            [0, 0, 1, 1, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 0, 0],
+            [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+        ];
+
+        for (let r = 0; r < art.length; r++) {
+            for (let c = 0; c < art[r].length; c++) {
                 const px = art[r][c];
                 if (px !== 0) {
                     g.rect(c * pSize, r * pSize, pSize, pSize).fill({ color: colors[px] });
                 }
             }
         }
+
+        this.createSlimeSpecialEffects(g, pSize, colors[7], colors[2]);
+        this.createSlimeJiggleEffect(g, pSize, art.length);
+
+        g.rect(3 * pSize, art.length * pSize, (art[0].length - 6) * pSize, pSize)
+            .fill({ color: 0x000000, alpha: 0.4 });
+
         return g;
+    }
+
+
+
+    private createSlimeSpecialEffects(g: Graphics, pSize: number, accentColor: number, bodyColor: number): void {
+        const core = new Graphics();
+        const centerX = 10 * pSize;
+        const centerY = 11 * pSize;
+        const animate = () => {
+            if (core.destroyed) { Ticker.shared.remove(animate); return; }
+            core.clear();
+            const time = Date.now() / 1000;
+            const pulse = 1 + Math.sin(time * 3) * 0.2;
+            for (let i = 3; i >= 0; i--) core.circle(centerX, centerY, (1 + i) * pSize * pulse).fill({ color: accentColor, alpha: 0.3 * (1 - i / 3) * pulse });
+            core.rect(centerX - pSize / 2, centerY - pSize / 2, pSize, pSize).fill({ color: bodyColor, alpha: 0.8 }); // Use bodyColor as base
+            core.rect(centerX - pSize / 2, centerY - pSize / 2, pSize, pSize).fill({ color: accentColor, alpha: 0.9 });
+        };
+        g.addChild(core);
+        Ticker.shared.add(animate);
+    }
+
+    private createSlimeJiggleEffect(g: Graphics, pSize: number, height: number): void {
+        const animate = () => {
+            if (g.destroyed) { Ticker.shared.remove(animate); return; }
+            const time = Date.now() / 1000;
+            g.scale.x = 1 + Math.sin(time * 2) * 0.04;
+            g.scale.y = 1 - Math.sin(time * 2) * 0.03;
+            g.y = this.game.app.screen.height * 0.616 + (1 - g.scale.y) * height * pSize;
+        };
+        Ticker.shared.add(animate);
+    }
+
+
+
+    private createSlimeProjectileEffect(targetX: number, targetY: number): void {
+        const ball = new Graphics();
+        ball.ellipse(0, 0, 10, 8).fill({ color: this.level > 10 ? 0xff4444 : 0x44ff44 }).stroke({ width: 2, color: 0xffffff, alpha: 0.5 });
+        this.container.addChild(ball);
+        const startX = this.monsterSprite.x;
+        const startY = this.monsterSprite.y;
+        const startTime = Date.now();
+        const animate = () => {
+            const progress = (Date.now() - startTime) / 600;
+            if (progress >= 1 || ball.destroyed) {
+                Ticker.shared.remove(animate);
+                if (!ball.destroyed) {
+                    this.createSlimeImpactEffect(targetX, targetY);
+                    ball.destroy();
+                }
+                return;
+            }
+            const arc = Math.sin(progress * Math.PI) * 100;
+            ball.x = startX + (targetX - startX) * progress;
+            ball.y = startY + (targetY - startY) * progress - arc;
+            ball.rotation = progress * Math.PI * 4;
+        };
+        Ticker.shared.add(animate);
+    }
+
+    private createSlimeImpactEffect(x: number, y: number): void {
+        const impact = new Graphics();
+        this.container.addChild(impact);
+        const startTime = Date.now();
+        const color = this.level > 10 ? 0xff4444 : 0x44ff44;
+        const animate = () => {
+            const p = (Date.now() - startTime) / 500;
+            if (p >= 1 || impact.destroyed) { Ticker.shared.remove(animate); if (!impact.destroyed) impact.destroy(); return; }
+            impact.clear();
+            impact.circle(x, y, p * 50).stroke({ width: (1 - p) * 4, color, alpha: 1 - p });
+        };
+        Ticker.shared.add(animate);
+    }
+
+    private executeGameOver() {
+        const p = this.game.playerState;
+        this.state = 'GAME_OVER';
+        this.feedbackText.text = "GAME OVER";
+        this.feedbackText.style.fill = '#ff0000';
+        this.updateUI();
+
+        // Clear save on death
+        import('../PlayerState').then(m => m.PlayerState.clearStorage());
+
+        if (typeof CloudSave !== 'undefined') {
+            CloudSave.reportMatchResult({
+                mode: this.mode,
+                level: this.level,
+                score: p.score,
+                maxCombo: p.highestCombo,
+                won: false
+            });
+        }
+
+        const acc = this.levelErrors === 0 ? 1.0 : 0.0;
+        LeaderboardSystem.saveRun({
+            date: new Date().toLocaleDateString(),
+            level: this.level,
+            accuracy: acc,
+            mode: this.mode,
+            playTime: 0,
+            typedCount: p.score
+        });
+
+        setTimeout(() => {
+            this.game.scenes.switchTo('gameover', { mode: this.mode, level: this.level, accuracy: acc });
+        }, 1500);
+    }
+
+
+
+    private animateCharacters() {
+        // Simple float for hero
+        if (this.heroSprite) {
+            const oy = this.heroSprite.y;
+            tweenManager.to({
+                target: this.heroSprite, props: { y: oy - 5 }, duration: 1500, easing: Easing.easeInOutQuad, onComplete: () => {
+                    tweenManager.to({ target: this.heroSprite, props: { y: oy }, duration: 1500, easing: Easing.easeInOutQuad, onComplete: () => this.animateCharacters() });
+                }
+            });
+        }
     }
 
     private showAchievementUnlock(ach: AchievementDef) {

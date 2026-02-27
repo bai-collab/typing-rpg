@@ -1,0 +1,401 @@
+# Pixel Engine 整合開發流程
+
+## 1. 戰鬥畫面、勇者、怪物改成用像素渲染引擎
+
+### 階段 1：基礎架構設定
+
+#### 1.1 建立像素引擎核心模組
+
+```markdown
+1. 建立目錄結構
+   - 在 src 下創建 pixel 資料夾
+   - 在根目錄建立 assets 資料夾及相關子目錄
+
+2. 實作 PixelEngine 核心類別
+   - 建立 src/pixel/PixelEngine.ts
+   - 設定像素縮放倍率 (PIXEL_SCALE = 4)
+   - 實作 configure() 方法設定 PixiJS 渲染選項
+   - 確保停用抗鋸齒，設定 nearest-neighbor 縮放
+
+3. 安裝與整合到 Game 類別
+   - 修改 Game.ts 中的 init() 方法加入 PixelEngine.configure(this.app)
+   - 更新 style.css 確保正確的像素渲染
+```
+
+#### 1.2 精靈圖管理系統
+
+```markdown
+1. 實作 SpriteSheetManager
+   - 建立 src/pixel/SpriteSheetManager.ts
+   - 實作 preload() 與 get() 方法
+   - 設計 SpriteSheetConfig 介面定義精靈圖資訊
+
+2. 精靈圖資源放置
+   - 在 assets/sprites/ 下放置 hero.png
+   - 在 assets/sprites/monsters/ 放置怪物精靈圖
+   - 在 assets/sprites/effects/ 放置特效精靈圖
+
+3. 更新 vite.config.ts
+   - 確保 assets 資料夾內容被正確打包
+```
+
+#### 1.3 像素角色與動畫系統
+
+```markdown
+1. 實作 PixelAnimator
+   - 建立 src/pixel/PixelAnimator.ts 
+   - 實作幀動畫控制邏輯
+   - 設計 update(), play() 等核心方法
+
+2. 實作 PixelSprite
+   - 建立 src/pixel/PixelSprite.ts
+   - 繼承 PixiJS Container
+   - 整合 PixelAnimator
+   - 實作 play(), flashDamage(), setPixelPosition() 等方法
+
+3. 測試基本動畫
+   - 建立簡單的測試腳本確認動畫播放正常
+```
+
+#### 1.4 粒子系統與特效
+
+```markdown
+1. 實作 PixelParticles
+   - 建立 src/pixel/PixelParticles.ts
+   - 設計 PixelParticle 介面
+   - 實作 burst(), emit(), update() 方法
+   
+2. 測試粒子特效
+   - 建立簡單測試確認粒子生成與消散效果
+```
+
+#### 1.5 像素風格 UI 組件
+
+```markdown
+1. 實作 PixelUI
+   - 建立 src/pixel/PixelUI.ts
+   - 實作 createHPBar(), createTimerBar(), createDialog() 等方法
+   - 使用 9-slice 技術實現可縮放的像素風 UI
+
+2. 實作 PixelFontRenderer
+   - 建立 src/pixel/PixelFontRenderer.ts
+   - 設計字型圖集載入邏輯
+   - 實作 renderText() 方法支援顏色、縮放等選項
+
+3. 準備 UI 資源
+   - 在 assets/tilesets/ 放置 ui-tiles.png
+   - 在 assets/fonts/ 放置 pixel-font.png
+```
+
+### 階段 2：整合到戰鬥場景
+
+#### 2.1 替換英雄繪製邏輯
+
+```markdown
+1. 分析 CombatScene.drawHero() 原始實現
+   - 確認原始方法的參數與回傳值
+   - 辨識需要保留的功能性邏輯
+
+2. 新增英雄 PixelSprite 實例
+   - 在 CombatScene 類別中新增 heroSprite: PixelSprite
+   - 在 enter() 方法中初始化 heroSprite
+
+3. 替換 drawHero() 方法
+   - 保留原方法簽名確保相容性
+   - 內部改為使用 heroSprite.play() 播放適當動畫
+   - 確保正確使用 PlayerState.characterTint
+```
+
+#### 2.2 替換怪物繪製邏輯
+
+```markdown
+1. 分析 CombatScene.drawMonster() 原始實現
+   - 確認原方法的參數與特殊效果
+   - 辨識需要保留的功能邏輯
+
+2. 新增怪物 PixelSprite 實例
+   - 在 CombatScene 類別中新增 monsterSprite: PixelSprite
+   - 在 setupMonster() 方法中初始化並根據等級選擇不同怪物精靈圖
+
+3. 替換 drawMonster() 方法
+   - 保留原方法簽名確保相容性
+   - 內部改為使用 monsterSprite.play() 播放適當動畫
+   - 實作等級提升的視覺效果（如尺寸、顏色變化）
+```
+
+#### 2.3 整合攻擊與特效
+
+```markdown
+1. 分析 CombatScene.resolveCombat() 中的特效邏輯
+   - 確認原攻擊特效與傷害顯示方式
+
+2. 替換粒子效果
+   - 用 PixelParticleSystem.burst() 取代 spawnParticles()
+   - 確保粒子特效觸發時機與原邏輯一致
+
+3. 新增攻擊動畫序列
+   - 在 resolveCombat() 中加入 heroSprite.play('attack')
+   - 在 executeMonsterCounter() 中加入 monsterSprite.play('attack')
+   - 使用動畫完成回調確保時序正確
+```
+
+#### 2.4 替換 UI 元素
+
+```markdown
+1. 替換血條與計時器
+   - 用 PixelUI.createHPBar() 取代原 Graphics 血條
+   - 用 PixelUI.createTimerBar() 取代原計時器條
+   - 確保更新邏輯與原有一致
+
+2. 替換文字顯示
+   - 使用 PixelFontRenderer.renderText() 取代原 Text 物件
+   - 優先替換單字顯示、傷害數值、連擊顯示等關鍵元素
+
+3. 測試性能與視覺效果
+   - 確保像素風格一致性
+   - 檢查性能是否有退化
+```
+
+#### 2.5 整合最終測試
+
+```markdown
+1. 全面測試戰鬥流程
+   - 測試戰鬥開始、打字輸入、傷害計算、回合結束等流程
+   - 確保所有動畫與特效正常觸發
+
+2. 性能優化
+   - 檢測幀率與記憶體使用
+   - 優化 SpriteSheet 快取與記憶體管理
+
+3. 視覺風格一致性檢查
+   - 確保所有元素都遵循像素風格設計原則
+   - 檢查在不同解析度下的顯示效果
+```
+
+## 2. 設計更多成就系統與英雄
+
+### 2.1 擴展成就系統
+
+```markdown
+1. 分析現有成就系統
+   - 研究 AchievementSystem.ts 實現方式
+   - 確認 typingRpgLifetimeStats 存儲結構
+
+2. 設計 10 個新成就
+   a. 單字大師：輸入超過 500 個不同單字
+   b. 速度之王：平均每分鐘打字超過 80 字
+   c. 收藏家：收集所有 R 稀有度道具
+   d. 精英收藏家：收集所有 SR 稀有度道具
+   e. 傳奇收藏家：收集所有 SSR 稀有度道具
+   f. 終極挑戰：通關 50 關卡
+   g. 無傷勇士：連續 5 關不受傷
+   h. 連擊王者：達成 100 連擊
+   i. 爆擊專家：觸發爆擊 50 次
+   j. 經濟大師：累積 10,000 金幣
+
+3. 實作成就追蹤邏輯
+   - 擴展 AchievementSystem.ts 加入新成就
+   - 在 CombatScene 相應位置添加成就檢查點
+```
+
+### 2.2 英雄系統設計
+
+```markdown
+1. 設計英雄基礎架構
+   - 建立 src/heroes/Hero.ts 定義英雄基礎類別
+   - 設計英雄特性介面，包含被動能力與主動技能
+   - 確保與現有 PlayerState 相容
+
+2. 設計 5 個獨特英雄
+   a. 戰士：基礎攻擊提升 20%，被動能力「憤怒」：連擊提升傷害加成
+   b. 法師：爆擊率提升 15%，主動技能「火球術」：5 連擊後下一擊造成 3 倍傷害
+   c. 遊俠：計時器時間加長 30%，被動「靈敏」：輸入完美不消耗時間
+   d. 坦克：最大生命值提升 30%，被動「堅韌」：首次瀕死自動回復 50% HP
+   e. 聖騎士：回復效果提升 25%，主動「神聖打擊」：10 連擊後下一擊同時回復 HP
+
+3. 實作英雄特效系統
+   - 設計特殊視覺效果
+   - 建立 assets/sprites/heroes/ 目錄存放英雄精靈圖
+```
+
+### 2.3 英雄解鎖機制
+
+```markdown
+1. 設計解鎖條件
+   - 將新英雄與新成就關聯
+   - 設計適當的解鎖門檻
+
+2. 實作英雄選擇介面
+   - 在 MainMenuScene 加入英雄選擇選項
+   - 設計英雄展示與選擇 UI
+
+3. 英雄存檔整合
+   - 擴展 PlayerState 加入當前選擇的英雄
+   - 更新 CloudSave 確保英雄資訊可以保存到雲端
+```
+
+### 2.4 英雄能力整合
+
+```markdown
+1. CombatScene 英雄能力整合
+   - 修改 applyPlayerStats() 考慮英雄特性
+   - 在 processInput() 和 resolveCombat() 中處理主動技能觸發
+
+2. 特殊效果視覺呈現
+   - 利用 PixelParticles 系統實作不同英雄的特效
+   - 確保各英雄特效具有辨識度與一致性
+
+3. 平衡性測試
+   - 確保不同英雄間平衡
+   - 調整英雄能力數值確保遊戲難度適中
+```
+
+## 3. 金幣系統
+
+### 3.1 金幣獲取機制
+
+```markdown
+1. 金幣設計與存儲
+   - 擴展 PlayerState 加入 coins 屬性
+   - 設計金幣獲取公式：基礎金幣 + 關卡獎勵 + 連擊獎勵 + 正確率獎勵
+
+2. 金幣獲取時機
+   - 在 CombatScene.resolveCombat() 結算金幣獲取
+   - 在 GameOverScene 顯示本次獲取的金幣數量
+
+3. 存檔整合
+   - 確保金幣數據包含在本地與雲端存檔中
+   - 更新 saveToStorage() 和相關雲端存檔方法
+```
+
+### 3.2 商店系統設計
+
+```markdown
+1. 設計商店介面
+   - 新建 src/scenes/ShopScene.ts
+   - 設計商店 UI，使用像素風格
+
+2. 商品設計
+   - 設計永久加成道具 (攻擊、防禦、血量等永久提升)
+   - 設計一次性消耗品 (單場戰鬥大幅提升某屬性)
+   - 設計特殊道具 (解鎖特殊功能或視覺效果)
+
+3. 商店流程整合
+   - 在 MainMenuScene 中加入商店入口
+   - 實作商品購買邏輯與確認流程
+```
+
+### 3.3 道具洗鍊系統
+
+```markdown
+1. 洗鍊機制設計
+   - 設計消耗金幣提升已有道具效果的系統
+   - 定義各類道具的提升上限與成功率
+
+2. 洗鍊介面
+   - 設計洗鍊 UI (可以整合到商店或獨立介面)
+   - 實作道具選擇與洗鍊結果展示
+
+3. 系統整合
+   - 更新 ItemSystem.ts 支援道具強化
+   - 擴展 Item 介面包含強化等級屬性
+```
+
+### 3.4 金幣系統測試與平衡
+
+```markdown
+1. 經濟平衡
+   - 確定金幣獲取與消費平衡
+   - 設計合理的價格梯度
+
+2. 進度曲線
+   - 測試不同遊戲階段的強化效果
+   - 確保遊戲難度隨玩家強化而適當調整
+
+3. 介面優化
+   - 確保所有金幣相關操作界面直觀易用
+   - 使用像素風格保持視覺一致性
+```
+
+## 4. 使用 Pixel 設計勇者、怪物、道具外觀
+
+### 4.1 設計風格確定
+
+```markdown
+1. 確定像素風格規範
+   - 決定基本角色尺寸 (如 16x16, 24x24, 32x32)
+   - 確定色板 (每個角色限制使用 8-16 色)
+   - 設定動畫幀數 (通常為 4-8 幀/動作)
+
+2. 參考資料收集
+   - 收集像素風格 RPG 參考素材
+   - 定義角色姿態與動作關鍵幀
+```
+
+### 4.2 英雄角色設計
+
+```markdown
+1. 設計基礎英雄
+   - 繪製基本英雄 idle, attack, hit, death 動畫
+   - 確保動畫流暢且保持像素風格特性
+
+2. 設計 5 個特色英雄
+   - 基於基礎英雄設計 5 個變體對應不同職業
+   - 為每個英雄設計獨特攻擊特效
+
+3. 組織精靈圖
+   - 將所有英雄動畫整理為標準精靈圖
+   - 確保統一的幀尺寸與佈局
+```
+
+### 4.3 怪物設計
+
+```markdown
+1. 設計基礎怪物類型
+   - 設計 5-10 種基礎怪物類型
+   - 為每種怪物繪製 idle, attack, hit, death 動畫
+
+2. 設計怪物變種系統
+   - 設計顏色變化機制表示不同等級怪物
+   - 考慮尺寸變化或裝飾部件表示精英/BOSS
+
+3. 整理怪物精靈圖
+   - 將所有怪物動畫整理為標準精靈圖
+   - 準備好用於 SpriteSheetManager 的配置
+```
+
+### 4.4 道具與 UI 元素設計
+
+```markdown
+1. 設計道具圖示
+   - 為 21 種道具設計像素風格圖示
+   - 區分 R, SR, SSR 稀有度的視覺風格
+
+2. 設計 UI 元素
+   - 設計像素風格按鈕、框架、指示器
+   - 製作 9-slice 邊框與背景
+
+3. 設計像素字體
+   - 設計完整的像素字體圖集
+   - 確保可讀性與像素風格一致性
+```
+
+### 4.5 整合與視覺效果測試
+
+```markdown
+1. 整合所有視覺元素
+   - 將所有設計導入遊戲
+   - 檢查所有視覺元素在遊戲中的表現
+
+2. 特效優化
+   - 添加像素風格的過渡效果
+   - 實作像素風格粒子特效系統
+
+3. 最終視覺效果檢查
+   - 確保所有元素保持像素風格一致性
+   - 檢查在不同解析度與裝置上的顯示效果
+```
+
+---
+
+您希望我修改以上某個部分的內容嗎？或者可以繼續討論下一步的細節？

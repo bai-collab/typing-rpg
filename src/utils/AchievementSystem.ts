@@ -4,6 +4,16 @@ export interface AchievementIds {
     PERFECTIONIST: string;
     SCHOLAR: string;
     IMMORTAL: string;
+    WORD_MASTER: string;
+    SPEED_KING: string;
+    COLLECTOR_R: string;
+    COLLECTOR_SR: string;
+    COLLECTOR_SSR: string;
+    ULTIMATE_CHALLENGE: string;
+    WARRIOR_NO_DAMAGE: string;
+    COMBO_KING: string;
+    CRIT_EXPERT: string;
+    ECONOMY_MASTER: string;
 }
 
 export const ACHIEVEMENTS: AchievementIds = {
@@ -11,7 +21,17 @@ export const ACHIEVEMENTS: AchievementIds = {
     COMBO_MASTER: 'combo_master',
     PERFECTIONIST: 'perfectionist',
     SCHOLAR: 'scholar',
-    IMMORTAL: 'immortal'
+    IMMORTAL: 'immortal',
+    WORD_MASTER: 'word_master',
+    SPEED_KING: 'speed_king',
+    COLLECTOR_R: 'collector_r',
+    COLLECTOR_SR: 'collector_sr',
+    COLLECTOR_SSR: 'collector_ssr',
+    ULTIMATE_CHALLENGE: 'ultimate_challenge',
+    WARRIOR_NO_DAMAGE: 'warrior_no_damage',
+    COMBO_KING: 'combo_king',
+    CRIT_EXPERT: 'crit_expert',
+    ECONOMY_MASTER: 'economy_master'
 };
 
 export interface AchievementDef {
@@ -31,6 +51,12 @@ export interface PlayerLifetimeStats {
     uniqueWordsTyped: string[];
     noReviveStreak: number;
     unlockedAchievements: { [id: string]: number }; // id -> timestamp completed
+    totalGold: number;
+    totalCrits: number;
+    noDamageStreak: number;
+    totalTypedChars: number;
+    totalTimeMs: number;
+    collectedItemIds: string[];
 }
 
 export const ACHIEVEMENT_DEFINITIONS: AchievementDef[] = [
@@ -78,6 +104,110 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDef[] = [
         rewardDesc: "神秘獎勵 (永久最大生命 +20%)",
         maxProgress: 20,
         getProgress: (s) => s.noReviveStreak
+    },
+    {
+        id: ACHIEVEMENTS.WORD_MASTER,
+        title: "單字大師 📖",
+        icon: "📖",
+        description: "輸入超過 500 個不同單字",
+        rewardDesc: "永久攻擊力 +10%",
+        maxProgress: 500,
+        getProgress: (s) => s.uniqueWordsTyped.length
+    },
+    {
+        id: ACHIEVEMENTS.SPEED_KING,
+        title: "速度之王 ⚡",
+        icon: "⚡",
+        description: "平均每分鐘打字超過 80 字",
+        rewardDesc: "每回合額外時間 +1秒",
+        maxProgress: 80,
+        getProgress: (s) => {
+            if (s.totalTimeMs === 0) return 0;
+            const mins = s.totalTimeMs / 60000;
+            const words = s.totalTypedChars / 5; // Standard 5 chars = 1 word
+            return Math.floor(words / mins);
+        }
+    },
+    {
+        id: ACHIEVEMENTS.COLLECTOR_R,
+        title: "收藏家 📦",
+        icon: "📦",
+        description: "收集所有 R 稀有度道具",
+        rewardDesc: "初始血量 +50",
+        maxProgress: 7, // Fixed number based on items/data.ts
+        getProgress: (s) => {
+            const rItems = ['atk_r', 'def_r', 'hp_r', 'heal_r', 'time_r', 'combo_r', 'charm_r'];
+            return rItems.filter(id => s.collectedItemIds.includes(id)).length;
+        }
+    },
+    {
+        id: ACHIEVEMENTS.COLLECTOR_SR,
+        title: "精英收藏家 💎",
+        icon: "💎",
+        description: "收集所有 SR 稀有度道具",
+        rewardDesc: "初始攻擊力 +5",
+        maxProgress: 7,
+        getProgress: (s) => {
+            const srItems = ['atk_sr', 'def_sr', 'hp_sr', 'heal_sr', 'time_sr', 'combo_sr', 'charm_sr'];
+            return srItems.filter(id => s.collectedItemIds.includes(id)).length;
+        }
+    },
+    {
+        id: ACHIEVEMENTS.COLLECTOR_SSR,
+        title: "傳奇收藏家 👑",
+        icon: "👑",
+        description: "收集所有 SSR 稀有度道具",
+        rewardDesc: "暴擊率永久 +10%",
+        maxProgress: 7,
+        getProgress: (s) => {
+            const ssrItems = ['atk_ssr', 'def_ssr', 'hp_ssr', 'heal_ssr', 'time_ssr', 'combo_ssr', 'charm_ssr'];
+            return ssrItems.filter(id => s.collectedItemIds.includes(id)).length;
+        }
+    },
+    {
+        id: ACHIEVEMENTS.ULTIMATE_CHALLENGE,
+        title: "終極挑戰 🏆",
+        icon: "🏆",
+        description: "通關 50 關卡",
+        rewardDesc: "專屬金閃閃角色皮膚",
+        maxProgress: 50,
+        getProgress: (s) => s.totalLevels
+    },
+    {
+        id: ACHIEVEMENTS.WARRIOR_NO_DAMAGE,
+        title: "無傷勇士 🛡️",
+        icon: "🛡️",
+        description: "連續 5 關不受傷",
+        rewardDesc: "生命值永久 +5% (可與其他加成疊加)",
+        maxProgress: 5,
+        getProgress: (s) => s.noDamageStreak
+    },
+    {
+        id: ACHIEVEMENTS.COMBO_KING,
+        title: "連擊王者 👑",
+        icon: "👑",
+        description: "達成 100 連擊",
+        rewardDesc: "爆擊傷害加倍",
+        maxProgress: 100,
+        getProgress: (s) => s.maxCombo
+    },
+    {
+        id: ACHIEVEMENTS.CRIT_EXPERT,
+        title: "爆擊專家 💥",
+        icon: "💥",
+        description: "觸發爆擊 50 次",
+        rewardDesc: "爆擊率 +5%",
+        maxProgress: 50,
+        getProgress: (s) => s.totalCrits
+    },
+    {
+        id: ACHIEVEMENTS.ECONOMY_MASTER,
+        title: "經濟大師 💰",
+        icon: "💰",
+        description: "累積 10,000 金幣",
+        rewardDesc: "每關結束額外獲得 10% 金幣",
+        maxProgress: 10000,
+        getProgress: (s) => s.totalGold
     }
 ];
 
@@ -96,7 +226,13 @@ export class AchievementSystem {
                     totalPerfectClears: parsed.totalPerfectClears || 0,
                     uniqueWordsTyped: Array.isArray(parsed.uniqueWordsTyped) ? parsed.uniqueWordsTyped : [],
                     noReviveStreak: parsed.noReviveStreak || 0,
-                    unlockedAchievements: parsed.unlockedAchievements || {}
+                    unlockedAchievements: parsed.unlockedAchievements || {},
+                    totalGold: parsed.totalGold || 0,
+                    totalCrits: parsed.totalCrits || 0,
+                    noDamageStreak: parsed.noDamageStreak || 0,
+                    totalTypedChars: parsed.totalTypedChars || 0,
+                    totalTimeMs: parsed.totalTimeMs || 0,
+                    collectedItemIds: Array.isArray(parsed.collectedItemIds) ? parsed.collectedItemIds : []
                 };
             } catch (e) {
                 console.error("Failed to parse lifetime stats", e);
@@ -108,7 +244,13 @@ export class AchievementSystem {
             totalPerfectClears: 0,
             uniqueWordsTyped: [],
             noReviveStreak: 0,
-            unlockedAchievements: {}
+            unlockedAchievements: {},
+            totalGold: 0,
+            totalCrits: 0,
+            noDamageStreak: 0,
+            totalTypedChars: 0,
+            totalTimeMs: 0,
+            collectedItemIds: []
         };
     }
 
@@ -137,7 +279,7 @@ export class AchievementSystem {
     }
 
     // Handlers for combat events
-    public static onLevelComplete(mode: string, accuracy: number, usedRevive: boolean, onUnlock: (a: AchievementDef) => void) {
+    public static onLevelComplete(mode: string, accuracy: number, usedRevive: boolean, tookDamage: boolean, onUnlock: (a: AchievementDef) => void) {
         if (mode === 'Beginner') return; // Beginner mode doesn't count towards achievements
         const stats = this.loadStats();
 
@@ -153,6 +295,43 @@ export class AchievementSystem {
             stats.noReviveStreak++;
         }
 
+        if (tookDamage) {
+            stats.noDamageStreak = 0;
+        } else {
+            stats.noDamageStreak++;
+        }
+
+        this.saveStats(stats);
+        this.checkUnlocks(stats, onUnlock);
+    }
+
+    public static onGoldEarned(amount: number, onUnlock: (a: AchievementDef) => void) {
+        const stats = this.loadStats();
+        stats.totalGold += amount;
+        this.saveStats(stats);
+        this.checkUnlocks(stats, onUnlock);
+    }
+
+    public static onCritTriggered(onUnlock: (a: AchievementDef) => void) {
+        const stats = this.loadStats();
+        stats.totalCrits++;
+        this.saveStats(stats);
+        this.checkUnlocks(stats, onUnlock);
+    }
+
+    public static onItemCollected(itemId: string, onUnlock: (a: AchievementDef) => void) {
+        const stats = this.loadStats();
+        if (!stats.collectedItemIds.includes(itemId)) {
+            stats.collectedItemIds.push(itemId);
+            this.saveStats(stats);
+            this.checkUnlocks(stats, onUnlock);
+        }
+    }
+
+    public static onStatsUpdate(chars: number, timeMs: number, onUnlock: (a: AchievementDef) => void) {
+        const stats = this.loadStats();
+        stats.totalTypedChars += chars;
+        stats.totalTimeMs += timeMs;
         this.saveStats(stats);
         this.checkUnlocks(stats, onUnlock);
     }

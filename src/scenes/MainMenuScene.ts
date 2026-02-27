@@ -2,6 +2,11 @@ import { Text, TextStyle } from 'pixi.js';
 import { Scene } from './Scene';
 import { AchievementSystem, ACHIEVEMENT_DEFINITIONS } from '../utils/AchievementSystem';
 import { CloudSave } from '../utils/CloudSave';
+import { HeroFactory, type HeroType } from '../heroes/HeroFactory';
+import { ShopSystem } from '../shop/ShopSystem';
+import { SHOP_ITEMS } from '../shop/ShopData';
+import { ITEMS } from '../items/ItemSystem';
+import { RefineSystem } from '../items/RefineSystem';
 
 export class MainMenuScene extends Scene {
     private titleText!: Text;
@@ -20,10 +25,10 @@ export class MainMenuScene extends Scene {
         if (savedData) {
             this.hasSaveData = true;
             this.savedLevel = savedData.level;
-            this.menuOptions = [`繼續遊戲 (Lv.${this.savedLevel})`, '新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '成就系統', '排行榜', '遊戲說明'];
+            this.menuOptions = [`繼續遊戲 (Lv.${this.savedLevel})`, '新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '選擇英雄', '商店', '成就系統', '排行榜', '遊戲說明'];
         } else {
             this.hasSaveData = false;
-            this.menuOptions = ['新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '成就系統', '排行榜', '遊戲說明'];
+            this.menuOptions = ['新手練習 (Beginner)', '進階練習 (Intermediate)', '高階挑戰 (Advanced)', '選擇英雄', '商店', '成就系統', '排行榜', '遊戲說明'];
         }
 
         const style = new TextStyle({
@@ -41,12 +46,12 @@ export class MainMenuScene extends Scene {
         this.titleText = new Text({ text: 'TYPING RPG', style });
         this.titleText.anchor.set(0.5);
         this.titleText.x = this.game.app.screen.width / 2;
-        this.titleText.y = this.game.app.screen.height * 0.25;
+        this.titleText.y = this.game.app.screen.height * 0.15;
         this.container.addChild(this.titleText);
 
         const optionStyle = new TextStyle({
             fontFamily: 'Courier New',
-            fontSize: 28,
+            fontSize: 24,
             fill: '#aaaaaa',
         });
 
@@ -54,7 +59,7 @@ export class MainMenuScene extends Scene {
             const t = new Text({ text: option, style: optionStyle });
             t.anchor.set(0.5);
             t.x = this.game.app.screen.width / 2;
-            t.y = this.game.app.screen.height * 0.43 + index * 45;
+            t.y = this.game.app.screen.height * 0.30 + index * 36;
 
             // Make interactive for touch/mouse
             t.interactive = true;
@@ -112,9 +117,11 @@ export class MainMenuScene extends Scene {
             if (modeIdx === 0) this.descriptionText.text = "無時間壓力，針對錯字加強練習";
             else if (modeIdx === 1) this.descriptionText.text = "練習單字 (預設 25秒)";
             else if (modeIdx === 2) this.descriptionText.text = "挑戰模式 (地獄 5秒)";
-            else if (modeIdx === 3) this.descriptionText.text = "查看解鎖的成就";
-            else if (modeIdx === 4) this.descriptionText.text = "查看本地前十名的高分紀錄";
-            else if (modeIdx === 5) this.descriptionText.text = "查看詳細的遊戲玩法與系統控制";
+            else if (modeIdx === 3) this.descriptionText.text = `選擇英雄角色 (目前: ${HeroFactory.getHeroIcon(this.game.playerState.heroType)} ${HeroFactory.getHeroName(this.game.playerState.heroType)})`;
+            else if (modeIdx === 4) this.descriptionText.text = `商店 · 購買道具與強化 (💰 ${this.game.playerState.gold} 金幣)`;
+            else if (modeIdx === 5) this.descriptionText.text = "查看解鎖的成就";
+            else if (modeIdx === 6) this.descriptionText.text = "查看本地前十名的高分紀錄";
+            else if (modeIdx === 7) this.descriptionText.text = "查看詳細的遊戲玩法與系統控制";
         }
     }
 
@@ -140,10 +147,14 @@ export class MainMenuScene extends Scene {
             const modeIdx = this.hasSaveData ? this.selectedIndex - 1 : this.selectedIndex;
 
             if (modeIdx === 3) {
-                this.showAchievementsModal();
+                this.showHeroSelectModal();
             } else if (modeIdx === 4) {
-                this.showLeaderboardModal();
+                this.showShopModal();
             } else if (modeIdx === 5) {
+                this.showAchievementsModal();
+            } else if (modeIdx === 6) {
+                this.showLeaderboardModal();
+            } else if (modeIdx === 7) {
                 this.showHelpModal();
             } else {
                 // New Game
@@ -152,6 +163,268 @@ export class MainMenuScene extends Scene {
                 this.game.scenes.switchTo('combat', { mode: selectedMode });
             }
         }
+    }
+
+    private showHeroSelectModal() {
+        if (document.getElementById('typing-rpg-modal')) return;
+
+        const modalOverlay = document.createElement('div');
+        modalOverlay.id = 'typing-rpg-modal';
+        Object.assign(modalOverlay.style, {
+            position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: '1000'
+        });
+
+        const modalBox = document.createElement('div');
+        Object.assign(modalBox.style, {
+            backgroundColor: '#1a1a2e', padding: '25px', borderRadius: '12px',
+            color: 'white', fontFamily: '"Microsoft JhengHei", Arial',
+            width: '650px', maxHeight: '85%', overflowY: 'auto',
+            border: '2px solid #e94560'
+        });
+
+        const currentHero = this.game.playerState.heroType;
+
+        const heroData: { type: HeroType; icon: string; name: string; desc: string; color: string }[] = [
+            { type: 'warrior', icon: '🗡️', name: '戰士 Warrior', desc: '暗紅鎧甲 · 雙手劍 · 火焰爆裂', color: '#ff4444' },
+            { type: 'mage', icon: '🔮', name: '法師 Mage', desc: '藍紫長袍 · 水晶杖 · 魔法箭矢', color: '#00ccff' },
+            { type: 'ranger', icon: '🏹', name: '遊俠 Ranger', desc: '翠綠皮甲 · 長弓 · 風之環', color: '#88cc44' },
+            { type: 'tank', icon: '🛡️', name: '坦克 Tank', desc: '深藍重甲 · 塔盾 · 衝擊波', color: '#4477bb' },
+            { type: 'paladin', icon: '⚔️', name: '聖騎士 Paladin', desc: '白金聖甲 · 聖劍 · 十字聖光', color: '#ffcc00' },
+        ];
+
+        let html = `<h2 style="margin-top:0; color:#e94560; text-align:center;">選擇英雄角色</h2>`;
+        html += `<div style="display:flex; flex-direction:column; gap:10px;">`;
+
+        for (const h of heroData) {
+            const isActive = h.type === currentHero;
+            html += `
+            <div class="hero-card" data-hero="${h.type}" style="
+                display:flex; align-items:center; gap:15px;
+                padding:12px 18px; border-radius:10px; cursor:pointer;
+                background:${isActive ? '#2a2a4e' : '#16213e'};
+                border:2px solid ${isActive ? h.color : '#333'};
+                transition: border-color 0.2s, background 0.2s;
+            ">
+                <div style="font-size:36px;">${h.icon}</div>
+                <div style="flex-grow:1;">
+                    <div style="font-weight:bold; font-size:18px; color:${h.color};">${h.name}</div>
+                    <div style="font-size:13px; color:#aaa;">${h.desc}</div>
+                </div>
+                ${isActive ? '<div style="color:#0f0; font-size:14px; font-weight:bold;">✓ 使用中</div>' : '<div style="color:#888; font-size:13px;">選擇</div>'}
+            </div>`;
+        }
+
+        html += `</div>`;
+        html += `<div style="text-align:center; margin-top:20px;">
+            <button id="close-modal-btn" style="padding:10px 20px; font-size:16px; cursor:pointer; background:#e94560; color:#fff; border:none; border-radius:5px;">關閉</button>
+        </div>`;
+
+        modalBox.innerHTML = html;
+        modalOverlay.appendChild(modalBox);
+        document.body.appendChild(modalOverlay);
+
+        // Bind click events
+        modalBox.querySelectorAll('.hero-card').forEach(card => {
+            const el = card as HTMLElement;
+            el.onmouseenter = () => { if (el.dataset.hero !== currentHero) el.style.borderColor = '#e94560'; };
+            el.onmouseleave = () => { if (el.dataset.hero !== currentHero) el.style.borderColor = '#333'; };
+            el.onclick = () => {
+                const heroType = el.dataset.hero as HeroType;
+                this.game.playerState.heroType = heroType;
+                this.game.playerState.saveToStorage(this.savedLevel, 'Beginner', 120, 0);
+                modalOverlay.remove();
+                // Refresh menu to update description
+                this.exit();
+                this.enter();
+            };
+        });
+
+        document.getElementById('close-modal-btn')!.onclick = () => modalOverlay.remove();
+    }
+
+    private showShopModal() {
+        if (document.getElementById('typing-rpg-modal')) return;
+
+        const modalOverlay = document.createElement('div');
+        modalOverlay.id = 'typing-rpg-modal';
+        Object.assign(modalOverlay.style, {
+            position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+            backgroundColor: 'rgba(0,0,0,0.88)', display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: '1000'
+        });
+
+        const modalBox = document.createElement('div');
+        Object.assign(modalBox.style, {
+            backgroundColor: '#1a1a2e', padding: '20px', borderRadius: '12px',
+            color: 'white', fontFamily: '"Microsoft JhengHei", Arial',
+            width: '700px', maxHeight: '85%', overflowY: 'auto',
+            border: '2px solid #e94560'
+        });
+        modalOverlay.appendChild(modalBox);
+        document.body.appendChild(modalOverlay);
+
+        const state = this.game.playerState;
+
+        const renderShop = (activeTab: string = 'permanent') => {
+            const tabs = [
+                { key: 'permanent', label: '永久加成' },
+                { key: 'consumable', label: '消耗品' },
+                { key: 'special', label: '特殊道具' },
+                { key: 'refine', label: '洗鍊強化' },
+            ];
+
+            let html = `<h2 style="margin-top:0; color:#e94560; text-align:center;">🏪 商店 <span style="color:#ffcc00;font-size:16px;">💰 ${state.gold} 金幣</span></h2>`;
+
+            // Tab bar
+            html += `<div style="display:flex; gap:5px; margin-bottom:15px; justify-content:center;">`;
+            for (const tab of tabs) {
+                const isActive = tab.key === activeTab;
+                html += `<button class="shop-tab" data-tab="${tab.key}" style="
+                    padding:8px 16px; border:1px solid ${isActive ? '#e94560' : '#555'}; border-radius:6px;
+                    background:${isActive ? '#e94560' : '#16213e'}; color:#fff; cursor:pointer; font-size:14px;
+                    font-family:inherit;
+                ">${tab.label}</button>`;
+            }
+            html += `</div>`;
+
+            if (activeTab !== 'refine') {
+                // Shop items
+                const items = SHOP_ITEMS.filter(i => i.category === activeTab);
+                html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
+                for (const item of items) {
+                    const owned = ShopSystem.getOwnedCount(item.id, state);
+                    const maxed = ShopSystem.isMaxed(item, state);
+                    const canBuy = ShopSystem.canAfford(item, state) && !maxed;
+                    const stackText = item.maxStack > 0 ? ` (${owned}/${item.maxStack})` : (item.category === 'consumable' ? ` (持有: ${owned})` : '');
+
+                    html += `<div style="display:flex; align-items:center; gap:12px; padding:10px 15px; border-radius:8px; background:#16213e; border:1px solid #333;">
+                        <div style="font-size:28px; width:40px; text-align:center;">${item.icon}</div>
+                        <div style="flex-grow:1;">
+                            <div style="font-weight:bold; font-size:15px; color:${maxed ? '#888' : '#fff'};">${item.name}${stackText}</div>
+                            <div style="font-size:12px; color:#aaa;">${item.description}</div>
+                        </div>
+                        <div style="text-align:right; min-width:100px;">
+                            <div style="color:#ffcc00; font-size:14px; margin-bottom:4px;">💰 ${item.price}</div>
+                            ${maxed
+                            ? '<span style="color:#888; font-size:12px;">已滿</span>'
+                            : `<button class="shop-buy-btn" data-item-id="${item.id}" style="
+                                    padding:5px 12px; border:none; border-radius:4px; cursor:${canBuy ? 'pointer' : 'not-allowed'};
+                                    background:${canBuy ? '#00aa44' : '#444'}; color:#fff; font-size:13px; font-family:inherit;
+                                    opacity:${canBuy ? '1' : '0.5'};
+                                ">購買</button>`
+                        }
+                        </div>
+                    </div>`;
+                }
+                html += `</div>`;
+            } else {
+                // Refine tab
+                const ownedItems = state.inventory.filter((id, idx) => state.inventory.indexOf(id) === idx);
+                if (ownedItems.length === 0) {
+                    html += `<div style="text-align:center; padding:40px; color:#888;">還沒有可洗鍊的道具<br>先在戰鬥中獲取道具吧！</div>`;
+                } else {
+                    html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
+                    for (const itemId of ownedItems) {
+                        const itemDef = ITEMS.find(i => i.id === itemId);
+                        if (!itemDef) continue;
+                        const currentLvl = state.enhanceLevels[itemId] || 0;
+                        const cost = RefineSystem.getUpgradeCost(currentLvl);
+                        const rate = RefineSystem.getSuccessRate(currentLvl, itemDef.rarity);
+                        const atMax = currentLvl >= RefineSystem.maxLevel;
+                        const canRefine = !atMax && cost !== Infinity && state.gold >= cost;
+                        const rarityColor = itemDef.rarity === 'SSR' ? '#ffaa00' : (itemDef.rarity === 'SR' ? '#cc88ff' : '#aaa');
+                        const stacks = state.itemStacks[itemId] || 0;
+                        const multiplier = RefineSystem.getEnhancedMultiplier(currentLvl);
+
+                        // Stars display
+                        let stars = '';
+                        for (let i = 0; i < RefineSystem.maxLevel; i++) {
+                            stars += i < currentLvl ? '★' : '☆';
+                        }
+
+                        html += `<div style="display:flex; align-items:center; gap:12px; padding:10px 15px; border-radius:8px; background:#16213e; border:1px solid ${rarityColor}33;">
+                            <div style="flex-grow:1;">
+                                <div style="font-weight:bold; font-size:15px;">
+                                    <span style="color:${rarityColor};">[${itemDef.rarity}]</span> ${itemDef.name} ×${stacks}
+                                    ${currentLvl > 0 ? `<span style="color:#ffcc00;"> +${currentLvl}</span>` : ''}
+                                </div>
+                                <div style="font-size:11px; color:#aaa;">${itemDef.description} (效果 ×${multiplier.toFixed(1)})</div>
+                                <div style="font-size:12px; color:#ffcc00; letter-spacing:2px;">${stars}</div>
+                            </div>
+                            <div style="text-align:right; min-width:120px;">
+                                ${atMax
+                                ? '<span style="color:#ffcc00; font-size:13px;">✨ 已滿級</span>'
+                                : `<div style="font-size:12px; color:#aaa; margin-bottom:3px;">💰 ${cost} · ${Math.round(rate * 100)}%</div>
+                                       <button class="shop-refine-btn" data-item-id="${itemId}" style="
+                                           padding:5px 12px; border:none; border-radius:4px; cursor:${canRefine ? 'pointer' : 'not-allowed'};
+                                           background:${canRefine ? '#cc6600' : '#444'}; color:#fff; font-size:13px; font-family:inherit;
+                                           opacity:${canRefine ? '1' : '0.5'};
+                                       ">洗鍊</button>`
+                            }
+                            </div>
+                        </div>`;
+                    }
+                    html += `</div>`;
+                }
+            }
+
+            html += `<div style="text-align:center; margin-top:15px;">
+                <button id="close-modal-btn" style="padding:8px 18px; font-size:15px; cursor:pointer; background:#e94560; color:#fff; border:none; border-radius:5px; font-family:inherit;">關閉</button>
+            </div>`;
+
+            modalBox.innerHTML = html;
+
+            // Bind tab switching
+            modalBox.querySelectorAll('.shop-tab').forEach(btn => {
+                (btn as HTMLElement).onclick = () => renderShop((btn as HTMLElement).dataset.tab || 'permanent');
+            });
+
+            // Bind buy buttons
+            modalBox.querySelectorAll('.shop-buy-btn').forEach(btn => {
+                (btn as HTMLElement).onclick = () => {
+                    const itemId = (btn as HTMLElement).dataset.itemId!;
+                    const shopItem = SHOP_ITEMS.find(i => i.id === itemId);
+                    if (!shopItem) return;
+                    const success = ShopSystem.purchase(shopItem, state);
+                    if (success) {
+                        state.saveToStorage(this.savedLevel, 'Beginner', 120, 0);
+                        renderShop(activeTab);
+                    }
+                };
+            });
+
+            // Bind refine buttons
+            modalBox.querySelectorAll('.shop-refine-btn').forEach(btn => {
+                (btn as HTMLElement).onclick = () => {
+                    const itemId = (btn as HTMLElement).dataset.itemId!;
+                    const itemDef = ITEMS.find(i => i.id === itemId);
+                    if (!itemDef) return;
+                    const result = RefineSystem.attemptRefine(itemId, itemDef.rarity, state);
+                    state.saveToStorage(this.savedLevel, 'Beginner', 120, 0);
+
+                    // Flash feedback
+                    const el = btn as HTMLElement;
+                    if (result.success) {
+                        el.textContent = '✨ 成功!';
+                        el.style.background = '#00cc44';
+                    } else {
+                        el.textContent = '💔 失敗';
+                        el.style.background = '#cc0000';
+                    }
+                    setTimeout(() => renderShop(activeTab), 800);
+                };
+            });
+
+            document.getElementById('close-modal-btn')!.onclick = () => {
+                modalOverlay.remove();
+                this.exit();
+                this.enter();
+            };
+        };
+
+        renderShop();
     }
 
     private showHelpModal() {
