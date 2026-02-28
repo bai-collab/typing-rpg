@@ -25,3 +25,6 @@ export type { MonsterSpriteData } from './sprites/MonsterSprites';
 
 export { NPC_SPRITES } from './sprites/NPCSprites';
 export type { NPCSpriteData } from './sprites/NPCSprites';
+
+export { BATTLE_ITEM_ICONS, SHOP_ITEM_ICONS, getBattleItemIcon, getShopItemIcon } from './sprites/ItemIcons';
+export type { ItemIconData } from './sprites/ItemIcons';

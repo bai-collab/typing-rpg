@@ -35,6 +35,7 @@ Typing RPG 的核心圖形引擎，使用 **程序化像素藝術 (Procedural Pi
 | `HeroSprites.ts` | 英雄像素圖 (idle/attack/hit/death) | 5 職業 × 4 姿勢 = **20 幀** |
 | `MonsterSprites.ts` | 怪物像素圖 + 等級選擇器 | **6 種怪物** |
 | `NPCSprites.ts` | NPC 像素圖 | **4 種 NPC** |
+| `ItemIcons.ts` | 道具像素圖示 (8×8) | **7 戰鬥 + 15 商店 = 22 個** |
 
 #### 英雄（HeroSprites）
 
@@ -65,6 +66,36 @@ Typing RPG 的核心圖形引擎，使用 **程序化像素藝術 (Procedural Pi
 | 💊 治療師 (healer) | 回復系統 |
 | 🔨 鐵匠 (blacksmith) | 洗鍊/強化系統 |
 | 📖 賢者 (sage) | 教學/任務系統 |
+
+#### 道具圖示（ItemIcons，8×8）
+
+**戰鬥道具** — 按類型分，稀有度用色彩區分
+
+| 圖示 | 類型 | 造型 |
+|------|------|------|
+| ⚔️ Attack | 攻擊 | 斜劍 |
+| 🛡️ Defense | 防禦 | 盾牌 |
+| ❤️ HP | 血量 | 愛心 |
+| 💊 Heal | 補血 | 綠藥水瓶 |
+| ⏱️ Time | 時間 | 沙漏 |
+| 🔥 Combo | 連擊 | 火焰 |
+| 🔮 Charm | 護符 | 水晶寶石 |
+
+**商店道具** — 15 個獨立圖示
+
+| 圖示 | ID | 造型 |
+|------|------|------|
+| 🧪 紅 | shop_potion_hp | 紅色藥水 |
+| 🧪 橙 | shop_potion_atk | 橙色藥水 |
+| 🧪 藍 | shop_potion_def | 藍色藥水 |
+| 🧪 青 | shop_potion_time | 青色藥水 |
+| 💎 | shop_revive | 藍鑽石 |
+| 🪙 | shop_gold_boost | 金幣 |
+| 📖 | shop_xp_boost | 書本 |
+| 🍀 | shop_lucky | 四葉草 |
+| 💥 | shop_crit_perm | 暴擊星 |
+| 🔥 | shop_skin_flame | 火焰光環 |
+| ❄️ | shop_skin_ice | 冰霜雪花 |
 
 ## 使用範例
 
