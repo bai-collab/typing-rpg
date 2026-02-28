@@ -19,6 +19,8 @@ Typing RPG 的核心圖形引擎，使用 **程序化像素藝術 (Procedural Pi
 
 ## 模組結構
 
+### 引擎模組
+
 | 模組 | 說明 | 用途 |
 |------|------|------|
 | `PixelRenderer` | 像素矩陣渲染器 | 將 2D 數字陣列 + 色盤轉為 PixiJS Graphics |
@@ -26,25 +28,75 @@ Typing RPG 的核心圖形引擎，使用 **程序化像素藝術 (Procedural Pi
 | `VFXLibrary` | 視覺特效庫 | 衝擊波、十字光、投射物、傷害數字、斬擊弧線 |
 | `SpriteAnimator` | 精靈動畫器 | 呼吸效果、果凍搖晃、武器發光、護盾光環 |
 
+### 精靈圖庫 (`sprites/`)
+
+| 檔案 | 內容 | 數量 |
+|------|------|------|
+| `HeroSprites.ts` | 英雄像素圖 (idle/attack/hit/death) | 5 職業 × 4 姿勢 = **20 幀** |
+| `MonsterSprites.ts` | 怪物像素圖 + 等級選擇器 | **6 種怪物** |
+| `NPCSprites.ts` | NPC 像素圖 | **4 種 NPC** |
+
+#### 英雄（HeroSprites）
+
+| 職業 | idle | attack | hit | death |
+|------|------|--------|-----|-------|
+| 🗡️ 戰士 (warrior) | ✅ | ✅ 揮劍 | ✅ 受擊後仰 | ✅ 倒地 |
+| 🔮 法師 (mage)     | ✅ | ✅ 施法 | ✅ 受擊後仰 | ✅ 倒地 |
+| 🏹 遊俠 (ranger)   | ✅ | ✅ 射箭 | ✅ 受擊後仰 | ✅ 倒地 |
+| 🛡️ 坦克 (tank)     | ✅ | ✅ 盾擊 | ✅ 受擊後仰 | ✅ 倒地 |
+| ⚔️ 聖騎士 (paladin) | ✅ | ✅ 聖擊 | ✅ 受擊後仰 | ✅ 倒地 |
+
+#### 怪物（MonsterSprites）
+
+| 名稱 | 等級範圍 | 描述 |
+|------|----------|------|
+| 🟢 Slime | Lv 1-5 | 經典果凍怪 |
+| 🦇 Bat | Lv 3-10 | 紫色蝙蝠 |
+| 💀 Skeleton | Lv 6-15 | 骷髏戰士 |
+| 👺 Goblin | Lv 8-20 | 綠皮哥布林 |
+| ⚔️ Dark Knight | Lv 15-30 | 黑騎士 |
+| 🐉 Dragon | Lv 25+ | 火龍 BOSS |
+
+#### NPC（NPCSprites）
+
+| 名稱 | 用途 |
+|------|------|
+| 🏪 商人 (shopkeeper) | 商店系統 |
+| 💊 治療師 (healer) | 回復系統 |
+| 🔨 鐵匠 (blacksmith) | 洗鍊/強化系統 |
+| 📖 賢者 (sage) | 教學/任務系統 |
+
 ## 使用範例
 
 ### 建立角色精靈
 
 ```typescript
-import { PixelRenderer, SpriteAnimator } from '../graphics';
+import { PixelRenderer, SpriteAnimator, HERO_SPRITES } from '../graphics';
 
-const COLORS = [0x000000, 0xffccaa, 0x888888, 0x555555, 0xcc3333];
-const ART = [
-    [0, 0, 3, 3, 0, 0],
-    [0, 3, 1, 1, 3, 0],
-    [3, 1, 4, 4, 1, 3],
-    [3, 2, 2, 2, 2, 3],
-    [0, 3, 3, 3, 3, 0],
-];
+const hero = HERO_SPRITES.warrior;
+const sprite = PixelRenderer.render(hero.idle, hero.colors, 3);
+PixelRenderer.addShadow(sprite, hero.idle, 3);
+SpriteAnimator.breathing(sprite, 3, hero.idle.length, 400);
+container.addChild(sprite);
+```
 
-const sprite = PixelRenderer.render(ART, COLORS, 3);
-PixelRenderer.addShadow(sprite, ART, 3);
-SpriteAnimator.breathing(sprite, 3, ART.length, 400);
+### 按等級取怪物
+
+```typescript
+import { PixelRenderer, getMonsterForLevel } from '../graphics';
+
+const monster = getMonsterForLevel(12); // 可能是 Skeleton 或 Goblin
+const sprite = PixelRenderer.render(monster.art, monster.colors, 3);
+container.addChild(sprite);
+```
+
+### 使用 NPC 精靈
+
+```typescript
+import { PixelRenderer, NPC_SPRITES } from '../graphics';
+
+const shopkeeper = NPC_SPRITES.shopkeeper;
+const sprite = PixelRenderer.render(shopkeeper.art, shopkeeper.colors, 3);
 container.addChild(sprite);
 ```
 
@@ -54,7 +106,7 @@ container.addChild(sprite);
 import { ParticleSystem } from '../graphics';
 
 const particles = new ParticleSystem(container);
-particles.burst(200, 300, 0xff0000, 20); // 紅色爆炸
+particles.burst(200, 300, 0xff0000, 20);
 // 在更新迴圈中：
 particles.update(delta);
 ```
