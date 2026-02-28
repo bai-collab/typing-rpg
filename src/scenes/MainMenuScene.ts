@@ -290,10 +290,19 @@ export class MainMenuScene extends Scene {
             html += `</div>`;
 
             if (activeTab !== 'refine') {
-                // Shop items
-                const items = SHOP_ITEMS.filter(i => i.category === activeTab);
+                const categoryItems = SHOP_ITEMS.filter(i => i.category === activeTab);
+
+                // Add a notice for consumables
+                if (activeTab === 'consumable') {
+                    html += `
+                    <div style="background: rgba(233, 69, 96, 0.15); border: 1px solid #e94560; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; color: #ff88aa;">
+                        ⚠️ <strong>消耗品說明：</strong><br>
+                        消耗品僅在<strong>啟動「新遊戲」</strong>時自動套用並消耗。若選擇「繼續遊戲」，效果將保留至下一場新局開始。
+                    </div>`;
+                }
+
                 html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
-                for (const item of items) {
+                for (const item of categoryItems) {
                     const owned = ShopSystem.getOwnedCount(item.id, state);
                     const maxed = ShopSystem.isMaxed(item, state);
                     const canBuy = ShopSystem.canAfford(item, state) && !maxed;

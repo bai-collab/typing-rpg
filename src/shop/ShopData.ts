@@ -25,11 +25,11 @@ export const SHOP_ITEMS: ShopItem[] = [
     { id: 'shop_time_perm', name: '時間延長', icon: '⏱️', category: 'permanent', price: 300, description: '永久回合時間 +0.3s', maxStack: 5 },
 
     // Consumables (single-use per battle)
-    { id: 'shop_potion_hp', name: '生命藥水', icon: '🧪', category: 'consumable', price: 50, description: '下場開始 +30% 最大血量', maxStack: 0 },
-    { id: 'shop_potion_atk', name: '力量藥水', icon: '🧪', category: 'consumable', price: 80, description: '下場攻擊力 ×1.5', maxStack: 0 },
-    { id: 'shop_potion_def', name: '鐵壁藥水', icon: '🧪', category: 'consumable', price: 80, description: '下場防禦力 ×1.5', maxStack: 0 },
-    { id: 'shop_potion_time', name: '時光藥水', icon: '🧪', category: 'consumable', price: 60, description: '下場回合時間 +5 秒', maxStack: 0 },
-    { id: 'shop_revive', name: '復活石', icon: '💎', category: 'consumable', price: 150, description: '下場額外復活 1 次', maxStack: 0 },
+    { id: 'shop_potion_hp', name: '生命藥水', icon: '🧪', category: 'consumable', price: 50, description: '下場新遊戲開始時 +30% 最大血量', maxStack: 0 },
+    { id: 'shop_potion_atk', name: '力量藥水', icon: '🧪', category: 'consumable', price: 80, description: '下場新遊戲時攻擊力 ×1.5', maxStack: 0 },
+    { id: 'shop_potion_def', name: '鐵壁藥水', icon: '🧪', category: 'consumable', price: 80, description: '下場新遊戲時防禦力 ×1.5', maxStack: 0 },
+    { id: 'shop_potion_time', name: '時光藥水', icon: '🧪', category: 'consumable', price: 60, description: '下場新遊戲時回合時間 +5 秒', maxStack: 0 },
+    { id: 'shop_revive', name: '復活石', icon: '💎', category: 'consumable', price: 150, description: '下場新遊戲時額外復活 1 次', maxStack: 0 },
 
     // Special / Permanent unlocks
     { id: 'shop_gold_boost', name: '招財符', icon: '🪙', category: 'special', price: 300, description: '永久金幣獲取 +10%', maxStack: 3 },
